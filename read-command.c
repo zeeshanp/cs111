@@ -15,7 +15,7 @@ typedef struct node
 
 struct command_stream
 {
-	int count;
+	int num;
     node* head;	
 }
 

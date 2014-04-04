@@ -2,36 +2,34 @@
 
 #include "command.h"
 #include "command-internals.h"
+#include "alloc.h"
 
 #include <error.h>
 
+typedef struct command_node* command_node_t;
 
-typedef struct node 
+struct command_node 
 {
 	command_t command;
-	node* next;
-} node;
+	command_node_t next;
+};
 
 
 struct command_stream
 {
-	int num;
-    node* head;	
-}
+	command_node_t head;	
+};
 
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
     
-    void* arg = get_next_byte_argument;
-	command_stream_t stream;
-	stream->num = 0;                                                                                           
+	command_stream_t stream = (command_stream_t)checked_malloc(sizeof(struct command_stream)); 
+	stream->head = 0;
 	int c;
-	while ( (c = get_next_byte(arg) != EOF )
-	{
-        //construct stream here.
-	}
+	while ((c = get_next_byte(get_next_byte_argument)) != -1)
+		continue;
 
 	return stream;
 }
@@ -40,7 +38,6 @@ make_command_stream (int (*get_next_byte) (void *),
 command_t
 read_command_stream (command_stream_t s)
 {
-  /* FIXME: Replace this with your implementation too.  */
-  error (1, 0, "command reading not yet implemented");
+  s->head = 0;
   return 0;
 }

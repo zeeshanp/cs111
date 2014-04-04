@@ -17,8 +17,6 @@ command_status (command_t c)
 void
 execute_command (command_t c, bool time_travel)
 {
-  /* FIXME: Replace this with your implementation.  You may need to
-     add auxiliary functions and otherwise modify the source code.
-     You can also use external functions defined in the GNU C Library.  */
+  c->status = (int)time_travel;
   error (1, 0, "command execution not yet implemented");
 }

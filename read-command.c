@@ -6,7 +6,7 @@
 
 #include <error.h>
 
-/* struct definitions */
+/* command stream */
 
 struct command_tree;
 {
@@ -18,6 +18,10 @@ struct command_stream
 	command_tree* command_list;
 	int num;		
 };
+
+/** Stack definitions
+ *  TODO: Test, garbage collection **/
+
 
 struct command_stack
 {
@@ -31,7 +35,7 @@ enum op_priority
 	THREE;
 	TWO;
 	ONE;
-};
+}
 
 struct op
 {
@@ -44,8 +48,6 @@ struct op_stack
 	struct op* stack;	
 	int top;
 };
-
-/* auxillary functions */
 
 
 void initStack(struct op_stack* op_stack)
@@ -88,6 +90,10 @@ void push(struct command_stack* cmd_stack, struct command cmd)
 	cmd_stack->stack[top] = cmd;
 }
 
+
+
+/* Auxillary Functions */
+
 int isValidChar(int c)
 {
 	return ( (c >= '0' && c <= '9') || ((c | 'a' - 'A') - 'a' < 26u) 
@@ -96,6 +102,42 @@ int isValidChar(int c)
 				|| c == '+' || c == ':' || c == ',' 
 				|| c == '.' || c == '/');
 }
+
+
+/*  Tokenizer stuff */
+
+
+enum token_type
+{
+	SIMPLE;
+	PIPE;
+	SEMI_COLON;
+	NEWLINE;
+	SUBSHELL;
+	INVALID;
+	END_OF_FILE;
+	WHITESPACE;
+	AND;
+	OR;
+	LESS_THAN;
+	GREATER_THAN;
+	OPEN_PARA;
+	CLOSE_PARA;
+	BAD;
+	
+}
+
+struct token
+{
+	char data*;
+	enum token_type type;
+	struct token* next;
+	struct token* prev;
+};
+
+enum token_type get_type(char* data);
+
+struct token* get_next_token(int* (get_next_byte) (void*), void* arg);
 
 
 

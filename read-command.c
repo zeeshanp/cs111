@@ -23,13 +23,6 @@ struct command_stack
 {
 	command_t stack;    
 	int top;
-
-};
-
-struct op_stack
-{
-	enum command_type* stack;
-	int top;
 };
 
 enum op_priority
@@ -40,46 +33,59 @@ enum op_priority
 	ONE;
 };
 
+struct op
+{
+	enum op_priority priority;
+	char* op[3];
+};
+
+struct op_stack
+{
+	struct op* stack;	
+	int top;
+};
 
 /* auxillary functions */
 
 
-void initStack(struct op_stack)
+void initStack(struct op_stack* op_stack)
 {
-	op_stack.stack = NULL;
-	int top = 0;
+	op_stack->stack = NULL;
+	op_stack->top = 0;
 }
 
-void initStack(struct command_stack)
+void initStack(struct command_stack* cmd_stack)
 {
-	command_stack.stack = NULL;
-	int top = 0;
+	cmd_stack->stack = NULL;
+	cmd_stack->top = 0;
 }
 
-char* pop(struct op_stack)
+char* pop(struct op_stack* op_stack)
 {
 	char* op[3];
-	strcpy(op,op_stack.stack[top--]);
+	strcpy(op,op_stack->stack[top--].op);
 	return op;
 }
 
-command_t pop(struct command_stack)
+command_t pop(struct command_stack* cmd_stack)
 {
-	return command_stack.stack[top--];
+	return cmd_stack->stack[top--];
 }
 
 //pretty sure i did this wrong lol
-void push(struct op_stack, char* op)
+void push(struct op_stack* op_stack, struct op op)
 {
-	op_stack.stack = (struct command*)checked_realloc(sizeof(op_stack.stack)+sizeof(struct command*));
-	top++;
-	strcpy(op_stack.stack[top],op);
+	op_stack->top++;
+	op_stack->stack = (struct op*)checked_realloc( top * sizeof(struct op) );
+	strcpy(op_stack->stack[op_stack->top]->op,op);
 }
 
-//will wait till i get the other one
-void push(struct command_stack, command_t cmd)
+//probably wrong as well
+void push(struct command_stack* cmd_stack, struct command cmd)
 {
-
+	cmd_stack->top++;
+	cmd_stack->stack = (command_t)checked_realloc( top * sizeof(struct command));
+	cmd_stack->stack[top] = cmd;
 }
 
 int isValidChar(int c)
@@ -98,10 +104,15 @@ make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
     
-	//command_stream_t is an array tree's that represent each complete command
+	
 
 	command_stream_t stream = (command_stream_t)checked_malloc(sizeof(struct command_stream)); 
-	stream->head = 0;
+	
+	struct op_stack op_stack;
+	struct command_stack cmd_stack;
+	initStack(
+
+
 	int c;
 	while ((c = get_next_byte(get_next_byte_argument)) != -1)
 		continue;

@@ -54,11 +54,7 @@ void push(stack_t s, void* data, size_t elemSize)
 	if (!s)
 		error(1,0, "cannot push to null stack");
 	if (s->top == s->max)
-	{
-		s->max *= 2;
-		s->data = (void**)checked_realloc( s->data, s->max * sizeof(void*));
-	}
-	s->data[s->top] = (void*)checked_malloc(elemSize);
+		s->data = (void**)checked_grow_alloc( s->data, &s->max);
 	s->data[(s->top)++] = data;
 }
 
@@ -66,7 +62,8 @@ void* pop(stack_t s)
 {
 	if (!s || s->top == 0)
 		error(1,0, "cannot pop from null or empty stack");
-	return s->data[s->top--];
+	(s->top)--;
+	return s->data[s->top];
 }
 
 void* top(stack_t s)
@@ -99,7 +96,7 @@ int isValidChar(int c)
 
 enum token_type
 {
-	SIMPLE,
+	SIMPLE,  //ls, tr, simple commands
 	PIPE,
 	SEMI_COLON,
 	DOUBLE_NEWLINE,  //2 newlines seperates commands
@@ -115,7 +112,7 @@ enum token_type
 	OPEN_PARA,
 	CLOSE_PARA,
 	EMPTY,
-	WORD,
+	WORD,  //hello in "echo hello"
 };
 
 typedef struct token* token_t;
@@ -128,127 +125,116 @@ struct token
 	token_t prev;
 };
 
-enum token_type get_type(char* data)
+token_t allocate_token(token_t prev, int dataSize, char* data, enum token_type type)
 {
-	int len = strlen(data);
-
-	if (len == 0)
-		return EMPTY;	
-
-	int i = 0;
-	while (data[i] != '\0')
-	{
-		char c = data[i];
-		if (len == 1)
-		{
-			switch (c)
-			{
-				case ' ': return WHITESPACE;
-				case '\n': return NEWLINE;
-				case -1: return END_OF_FILE;
-				case ';': return SEMI_COLON;
-				case '(': return OPEN_PARA;
-				case ')': return CLOSE_PARA;
-				case '<': return LESS_THAN;
-				case '>': return GREATER_THAN;
-				case '|': return PIPE;
-				default: break;
-			}
-		}
-		if (len == 2)
-		{
-			if (data[i] == '&' && data[i+1] == '&')
-				return AND;
-			if (data[i] == '|' && data[i+1] == '|')
-				return OR; 
-			if (data[i] == '\n' && data[i+1] == '\n')
-				return DOUBLE_NEWLINE;
-		}
-		
-		if (isValidChar(data[i]))
-		{
-			i++;
-			continue;
-		}
-		else
-		{
-			return INVALID;
-		}
-		i++;
-	}
-	return WORD;
+	token_t t;
+	prev->next = t;
+	t->prev = prev;
+	t->data =(char*)checked_malloc(dataSize*sizeof(char));
+	strcpy(t->data,data);
+	t->type = type;
+	t->next = 0;
+	return t;
 }
 
 token_t create_token_list(char* file)
 {
 	int i = 0;
+	
+	//i think head should be a dummy header (no data)
 	token_t head = checked_malloc(sizeof(struct token));
-	head->next = 0;
+	head->data = 0;
 	head->prev = 0;
-	token_t cur = head;
+	head->next = 0;
+	token_t prev = head;
 	while (file[i] != '\0')
 	{
-		
+		token_t cur;
+
+		//should each token end in a '\0'? 
 		if (!isValidChar(data[i]))
 		{
-			;//error
+			error(1,0,"invalid token");
 		}
 		if (file[i] == ' ')
 		{
 			i++;
 			continue;
 		}
+		//find a comment
+		if (file[i] == '#')
+		{
+			while (file[i] != '\n' || file[i] != '\0')
+				i++;
+			if (file[i] == '\n')
+				i++;
+		}
 
 		char c = file[i];
-
-		if (c == -1)
+	
+		
+		if (c == ';')
 		{
-			cur->type = END_OF_FILE; 
-			cur->data = c;
-		}
-		else if (c == ';')
-		{
-			cur->type = SEMI_COLON;
-			cur->data = c;
+			char* semi = ";\0";
+			cur = allocate_token(prev,2,semi, SEMI_COLON);
 		}
 		else if (c == '(')
 		{
-			cur->type = OPEN_PARA;
-			cur->data = c;
+			char* open = "(\0";
+			cur = allocate_token(prev,2,open, OPEN_PARA);
 		}
 		else if (c == ')')
 		{
-			cur->type = CLOSE_PARA;
-			cur->data = c;
+			char* close = ")\0";
+			cur = allocate_token(prev,2,close, CLOSE_PARA);
 		}
 		else if (c == '<')
 		{
-			cur->type = LESS_THAN;
-			cur->data = c;
+			char* less = "<\0";
+			cur = allocate_token(prev,2,less, LESS_THAN);
 		}
 		else if (c == '>')
 		{
-			cur->type = GREATER_THAN;
-			cur->data = c;
+			char* greater = ">\0";
+			cur = allocate_token(prev,2,greater, GREATER_THAN);
 		}
 		else if (c == '|')
 		{
-			cur->type = PIPE;
-			cur->data = c;
+			if (file[i+1] == '|') 
+			{
+				char* or = "||\0";
+				cur = allocate_token(prev,3,or,OR); 
+				i++;
+			}
+			else
+			{
+				char* pipe = "|\0";
+				cur = allocate_token(prev,2,pipe,PIPE);
+			}
 		}
 		else if (c == '\n')
 		{
-			cur->type = NEWLINE; 
-			cur->data = c;
+			if (file[i+1] == '\n')
+			{
+				char* double_new = "\n\n\0";
+				cur = allocate_token(prev,3,double_new,DOUBLE_NEWLINE);
+				i++;
+			}
+			else
+			{
+				char* newline = "\n\0";
+				cur = allocate_token(prev,2,newline,NEWLINE);
+			}
+		}
+		else
+		{
+			//this could be a simple word like "hello" or a command like echo,
+			//how to tell the difference?
 		}
 
-		//check for individual and/ors, and just have a long linked list of tokens with duplicates
-
-
-		token_t t = checked_malloc(sizeof(struct token));
 		
-
-
+		prev = cur;
+		i++;	
 		
 	}
 

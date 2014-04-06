@@ -7,6 +7,9 @@
 #include <error.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <ctype.h>
 
 /* command stream */
 
@@ -34,7 +37,8 @@ stack_t stack_init()
 	stack_t temp = (stack_t)checked_malloc(sizeof(struct stack));
 	temp->max = 32;
 	temp->top = 0;
-	temp->data = (void**)checked_malloc(temp->max * sizeof(void*));	
+	temp->data = (void**)checked_malloc(temp->max * sizeof(void*));
+	return temp;
 }
 
 void stack_free(stack_t s)
@@ -160,7 +164,7 @@ enum token_type get_type(char* data)
 			if (data[i] == '\n' && data[i+1] == '\n')
 				return DOUBLE_NEWLINE;
 		}
-					
+		
 		if (isValidChar(data[i]))
 		{
 			i++;
@@ -175,12 +179,82 @@ enum token_type get_type(char* data)
 	return WORD;
 }
 
-token_t get_next_token(char* file, token_t prev)
+token_t create_token_list(char* file)
 {
+	int i = 0;
+	token_t head = checked_malloc(sizeof(struct token));
+	head->next = 0;
+	head->prev = 0;
+	token_t cur = head;
+	while (file[i] != '\0')
+	{
+		
+		if (!isValidChar(data[i]))
+		{
+			;//error
+		}
+		if (file[i] == ' ')
+		{
+			i++;
+			continue;
+		}
 
+		char c = file[i];
+
+		if (c == -1)
+		{
+			cur->type = END_OF_FILE; 
+			cur->data = c;
+		}
+		else if (c == ';')
+		{
+			cur->type = SEMI_COLON;
+			cur->data = c;
+		}
+		else if (c == '(')
+		{
+			cur->type = OPEN_PARA;
+			cur->data = c;
+		}
+		else if (c == ')')
+		{
+			cur->type = CLOSE_PARA;
+			cur->data = c;
+		}
+		else if (c == '<')
+		{
+			cur->type = LESS_THAN;
+			cur->data = c;
+		}
+		else if (c == '>')
+		{
+			cur->type = GREATER_THAN;
+			cur->data = c;
+		}
+		else if (c == '|')
+		{
+			cur->type = PIPE;
+			cur->data = c;
+		}
+		else if (c == '\n')
+		{
+			cur->type = NEWLINE; 
+			cur->data = c;
+		}
+
+		//check for individual and/ors, and just have a long linked list of tokens with duplicates
+
+
+		token_t t = checked_malloc(sizeof(struct token));
+		
+
+
+		
+	}
 
 }
 
+token_t change_duplicates(token_t head); //aux function: checking linked list of tokens and converting doubles (&&, ||, etc) to single tokens
 
 char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
 {
@@ -204,18 +278,15 @@ char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
 }
 
 
-command_stream_t
-make_command_stream (int (*get_next_byte) (void *),
-		     void *get_next_byte_argument)
+/*** do this ***/
+command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_next_byte_argument)
 {
-    
-	token_t t = checked_malloc(sizeof(struct token));
 	char* file = readFile(get_next_byte, get_next_byte_argument);
-	for(;;)
-	{
-		token_t temp = get_next_token(file, t);
-	}
-
+	/* gneeral guideline:
+	- create linked list of tokens (white space is removed from this step) using create_token_list
+	- remove doubles
+	- parse through linked list, this is where the pseudocode with the two stacks will be used
+	*/
 	done_parsing:	
 
 	

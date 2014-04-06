@@ -175,8 +175,33 @@ enum token_type get_type(char* data)
 	return WORD;
 }
 
-struct token* get_next_token(int* (get_c) (void*), void* arg);
+token_t get_next_token(char* file, token_t prev)
+{
 
+
+}
+
+
+char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
+{
+	int inputSize = 128;
+	int count = 0;
+	int c;
+	char* stream = (char*)checked_malloc(inputSize*sizeof(char));
+
+	while ( (c = get_next_byte(get_next_byte_argument)) != -1)
+	{
+		stream[count++] = c;
+		if (count == inputSize)
+		{
+			inputSize += 128;
+			stream = (char*)checked_realloc(stream, inputSize*sizeof(char));
+		}
+	}
+	stream[count] = -1;
+	return stream;
+
+}
 
 
 command_stream_t
@@ -184,16 +209,17 @@ make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
 {
     
+	token_t t = checked_malloc(sizeof(struct token));
+	char* file = readFile(get_next_byte, get_next_byte_argument);
+	for(;;)
+	{
+		token_t temp = get_next_token(file, t);
+	}
+
+	done_parsing:	
+
 	
 
-//basic idea: make linked list of tokens
-//remove any newlines
-//put into treees
-	int c;
-	while ((c = get_next_byte(get_next_byte_argument)) != -1)
-		continue;
-	
-	return 0;
 }
 
 

@@ -28,8 +28,8 @@ typedef struct stack* stack_t;
 struct stack
 {
 	void** data;
-	int max;
-	int top;
+	size_t max;
+	size_t top;
 };
 
 stack_t stack_init()
@@ -60,8 +60,10 @@ void push(stack_t s, void* data, size_t elemSize)
 
 void* pop(stack_t s)
 {
-	if (!s || s->top == 0)
-		error(1,0, "cannot pop from null or empty stack");
+	if (!s)
+		error(1,0, "cannot pop from null stack");
+	if (s->top == 0)
+		error(1,0, "cannot pop from empty stack");
 	(s->top)--;
 	return s->data[s->top];
 }
@@ -127,7 +129,7 @@ struct token
 
 token_t allocate_token(token_t prev, int dataSize, char* data, enum token_type type)
 {
-	token_t t;
+	token_t t = (token_t)checked_malloc(sizeof(struct token));
 	prev->next = t;
 	t->prev = prev;
 	t->data =(char*)checked_malloc(dataSize*sizeof(char));
@@ -152,7 +154,7 @@ token_t create_token_list(char* file)
 		token_t cur;
 
 		//should each token end in a '\0'? 
-		if (!isValidChar(data[i]))
+		if (!isValidChar(file[i]))
 		{
 			error(1,0,"invalid token");
 		}
@@ -238,6 +240,7 @@ token_t create_token_list(char* file)
 		
 	}
 
+	return 0;
 }
 
 token_t change_duplicates(token_t head); //aux function: checking linked list of tokens and converting doubles (&&, ||, etc) to single tokens
@@ -273,9 +276,8 @@ command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_n
 	- remove doubles
 	- parse through linked list, this is where the pseudocode with the two stacks will be used
 	*/
-	done_parsing:	
 
-	
+	return 0;
 
 }
 

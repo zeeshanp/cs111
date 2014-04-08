@@ -11,85 +11,86 @@
 #include <stddef.h>
 #include <ctype.h>
 
-/* command stream */
-
-
 
 struct command_stream
 {
 	command_t head;			
 };
 
-/** Stack definitions
- *                       */
 
 typedef struct stack* stack_t;
 
 struct stack
 {
+<<<<<<< HEAD
+    void** data;
+    size_t count;
+    size_t max_count;
+=======
 	void** data;
 	size_t max;
 	size_t top;
+>>>>>>> 3f6f1890fb8a9ed6c103038fe3cfc77ade8a8215
 };
 
-stack_t stack_init()
+static stack_t stack_init()
 {
-	stack_t temp = (stack_t)checked_malloc(sizeof(struct stack));
-	temp->max = 32;
-	temp->top = 0;
-	temp->data = (void**)checked_malloc(temp->max * sizeof(void*));
-	return temp;
+    stack_t s = (stack_t)checked_malloc(sizeof(struct stack));
+    s->max_count = 16;
+    s->count = 0;
+    s->data = (void**)checked_malloc(s->max_count * sizeof(void*));
+    return s;
 }
 
-void stack_free(stack_t s)
+static void stack_free(stack_t s)
 {
-	if (!s)
-		error(1,0, "cannot delete null stack");
-	free(s->data);
-	free(s);
+    if (!s) error(1, 0, "Null stack point given to stack free");
+    free(s->data);
+    free(s);
 }
 
-void push(stack_t s, void* data, size_t elemSize)
+static void stack_push(stack_t s, void* element)
 {
-	if (!s)
-		error(1,0, "cannot push to null stack");
-	if (s->top == s->max)
-		s->data = (void**)checked_grow_alloc( s->data, &s->max);
-	s->data[(s->top)++] = data;
+    if (!s) error(1, 0, "Null stack point given to stack push");
+    if (s->count == s->max_count)
+        s->data = (void**)checked_grow_alloc(s->data, &s->max_count);
+    s->data[s->count++] = element;
 }
 
-void* pop(stack_t s)
+static void* stack_pop(stack_t s)
 {
+<<<<<<< HEAD
+    if (!s) error(1, 0, "Null stack point given to stack pop");
+    if (s->count == 0) error(1, 0, "Trying to pop from empty stack");
+    return s->data[--s->count];
+=======
 	if (!s)
 		error(1,0, "cannot pop from null stack");
 	if (s->top == 0)
 		error(1,0, "cannot pop from empty stack");
 	(s->top)--;
 	return s->data[s->top];
+>>>>>>> 3f6f1890fb8a9ed6c103038fe3cfc77ade8a8215
 }
 
-void* top(stack_t s)
+static void* stack_top(stack_t s)
 {
-	if (!s)
-		error(1,0, "can't find top of null stack");
-	return s->data[s->top-1];
+    if (!s) error(1, 0, "Null stack point given to stack top");
+    if (s->count == 0) error(1, 0, "Trying to get top from empty stack");
+    return s->data[s->count - 1];
 }
 
-int stack_size(stack_t s)
+static size_t stack_count(stack_t s)
 {
-	return s->top;
+    if (!s) error(1, 0, "Null stack point given to stack count");
+    return s->count;
 }
-
-
-/* Auxillary Functions */
 
 int isValidChar(int c)
 {
 	return ( (c >= '0' && c <= '9') || ((c | ('a' - 'A')) - 'a' < 26u) 
-				|| c == '!' || c == '@' || c == '%' 
-				|| c == '^' || c == '-' || c == '_'
-				|| c == '+' || c == ':' || c == ',' 
-				|| c == '.' || c == '/');
+			|| c == '!' || c == '@' || c == '%' || c == '^' || c == '-' || c == '_'
+			|| c == '+' || c == ':' || c == ',' || c == '.' || c == '/');
 }
 
 
@@ -98,23 +99,18 @@ int isValidChar(int c)
 
 enum token_type
 {
-	SIMPLE,  //ls, tr, simple commands
 	PIPE,
 	SEMI_COLON,
-	DOUBLE_NEWLINE,  //2 newlines seperates commands
 	NEWLINE,
-	SUBSHELL,
 	INVALID,
 	END_OF_FILE,
-	WHITESPACE,
 	AND,
 	OR,
 	LESS_THAN,
 	GREATER_THAN,
 	OPEN_PARA,
 	CLOSE_PARA,
-	EMPTY,
-	WORD,  //hello in "echo hello"
+	WORD, 
 };
 
 typedef struct token* token_t;
@@ -129,7 +125,11 @@ struct token
 
 token_t allocate_token(token_t prev, int dataSize, char* data, enum token_type type)
 {
+<<<<<<< HEAD
+	token_t t = checked_malloc(sizeof(struct token));
+=======
 	token_t t = (token_t)checked_malloc(sizeof(struct token));
+>>>>>>> 3f6f1890fb8a9ed6c103038fe3cfc77ade8a8215
 	prev->next = t;
 	t->prev = prev;
 	t->data =(char*)checked_malloc(dataSize*sizeof(char));
@@ -139,19 +139,29 @@ token_t allocate_token(token_t prev, int dataSize, char* data, enum token_type t
 	return t;
 }
 
+void reportError(int linenum)
+{
+	fprintf(stderr, "Error Parsing: Line %d.", linenum);
+	exit(1);
+}
+
 token_t create_token_list(char* file)
 {
 	int i = 0;
-	
-	//i think head should be a dummy header (no data)
+
 	token_t head = checked_malloc(sizeof(struct token));
 	head->data = 0;
 	head->prev = 0;
 	head->next = 0;
 	token_t prev = head;
+	int lineNum = 0;
 	while (file[i] != '\0')
 	{
 		token_t cur;
+<<<<<<< HEAD
+		
+		if (file[i] == ' ' || file[i] == '\t')
+=======
 
 		//should each token end in a '\0'? 
 		if (!isValidChar(file[i]))
@@ -159,21 +169,18 @@ token_t create_token_list(char* file)
 			error(1,0,"invalid token");
 		}
 		if (file[i] == ' ')
+>>>>>>> 3f6f1890fb8a9ed6c103038fe3cfc77ade8a8215
 		{
 			i++;
 			continue;
 		}
-		//find a comment
 		if (file[i] == '#')
 		{
 			while (file[i] != '\n' || file[i] != '\0')
 				i++;
-			if (file[i] == '\n')
-				i++;
 		}
 
 		char c = file[i];
-	
 		
 		if (c == ';')
 		{
@@ -216,34 +223,37 @@ token_t create_token_list(char* file)
 		}
 		else if (c == '\n')
 		{
-			if (file[i+1] == '\n')
-			{
-				char* double_new = "\n\n\0";
-				cur = allocate_token(prev,3,double_new,DOUBLE_NEWLINE);
-				i++;
-			}
-			else
-			{
-				char* newline = "\n\0";
-				cur = allocate_token(prev,2,newline,NEWLINE);
-			}
+			char* newline = "\n\0";
+			cur = allocate_token(prev,2,newline,NEWLINE);
+			
 		}
 		else
 		{
-			//this could be a simple word like "hello" or a command like echo,
-			//how to tell the difference?
+			int count = 1;
+			char* word = checked_malloc( count * sizeof(char));
+			word[count - 1] = c;
+			i++;
+			while (file[i] != ' ' && file[i] != '\0' && file[i] != '\n' && file[i] != '\t')
+			{
+				count++;
+				word = checked_realloc(word, count * sizeof(char));
+				word[count-1] = file[i];
+				if (file[i] != \n)
+					i++;
+			}
+			word[count] = '\0';
+			cur = allocate_token(prev,count,word,WORD);
 		}
-
 		
 		prev = cur;
 		i++;	
-		
+
 	}
+	return head;
 
 	return 0;
 }
 
-token_t change_duplicates(token_t head); //aux function: checking linked list of tokens and converting doubles (&&, ||, etc) to single tokens
 
 char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
 {
@@ -267,10 +277,25 @@ char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
 }
 
 
-/*** do this ***/
+
 command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_next_byte_argument)
 {
+	/* read in file */
 	char* file = readFile(get_next_byte, get_next_byte_argument);
+<<<<<<< HEAD
+	token_t head = create_token_list(file);
+	token_t temp = head->next;
+	command_stream_t cs;
+	while ( temp != 0)
+	{
+		//create command tree's here.
+
+	}
+
+	return cs;
+
+
+=======
 	/* gneeral guideline:
 	- create linked list of tokens (white space is removed from this step) using create_token_list
 	- remove doubles
@@ -278,6 +303,7 @@ command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_n
 	*/
 
 	return 0;
+>>>>>>> 3f6f1890fb8a9ed6c103038fe3cfc77ade8a8215
 
 }
 

@@ -18,16 +18,15 @@ struct command_node
 {
 	command_t data;
 	command_node_t next;
-}
+};
  
 struct command_stream
 {
 	command_node_t head;			
 };
  
- 
+/* Stack */ 
 typedef struct stack* stack_t;
- 
 struct stack
 {
     void** data;
@@ -43,14 +42,12 @@ static stack_t stack_init()
     s->data = (void**)checked_malloc(s->max_count * sizeof(void*));
     return s;
 }
- 
 static void stack_free(stack_t s)
 {
     if (!s) error(1, 0, "Null stack point given to stack free");
     free(s->data);
     free(s);
 }
- 
 static void stack_push(stack_t s, void* element)
 {
     if (!s) error(1, 0, "Null stack point given to stack push");
@@ -58,21 +55,18 @@ static void stack_push(stack_t s, void* element)
         s->data = (void**)checked_grow_alloc(s->data, &s->max_count);
     s->data[s->count++] = element;
 }
- 
 static void* stack_pop(stack_t s)
 {
     if (!s) error(1, 0, "Null stack point given to stack pop");
     if (s->count == 0) error(1, 0, "Trying to pop from empty stack");
     return s->data[--s->count];
 }
- 
 static void* stack_top(stack_t s)
 {
     if (!s) error(1, 0, "Null stack point given to stack top");
     if (s->count == 0) error(1, 0, "Trying to get top from empty stack");
     return s->data[s->count - 1];
-}
- 
+} 
 static size_t stack_count(stack_t s)
 {
     if (!s) error(1, 0, "Null stack point given to stack count");
@@ -85,8 +79,29 @@ int isValidChar(int c)
 			|| c == '!' || c == '@' || c == '%' || c == '^' || c == '-' || c == '_'
 			|| c == '+' || c == ':' || c == ',' || c == '.' || c == '/');
 }
-/*  Tokenizer stuff */
+
+char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
+{
+	int inputSize = 128;
+	int count = 0;
+	int c;
+	char* stream = (char*)checked_malloc(inputSize*sizeof(char));
  
+	while ( (c = get_next_byte(get_next_byte_argument)) != -1)
+	{
+		stream[count++] = c;
+		if (count == inputSize)
+		{
+			inputSize += 128;
+			stream = (char*)checked_realloc(stream, inputSize*sizeof(char));
+		}
+	}
+	stream[count] = -1;
+	return stream;
+ 
+}
+
+/*  Tokenizer stuff */
 enum token_type
 {
 	PIPE,
@@ -128,7 +143,7 @@ void reportError(int linenum)
 	fprintf(stderr, "Error Parsing: Line %d.", linenum);
 	exit(1);
 }
- 
+
 token_t create_token_list(char* file)
 {
 	int i = 0;
@@ -138,7 +153,7 @@ token_t create_token_list(char* file)
 	head->prev = 0;
 	head->next = 0;
 	token_t prev = head;
-	int lineNum = 0;
+	//int lineNum = 0;
 	while (file[i] != '\0')
 	{
 		token_t cur;
@@ -156,7 +171,12 @@ token_t create_token_list(char* file)
  
 		char c = file[i];
 		
-		if (c == ';')
+		if (c == '&' && file[i+1] == '&')
+		{
+			char* and = "&&\0";
+			cur = allocate_token(prev,3,and, AND);
+		}
+		else if (c == ';')
 		{
 			char* semi = ";\0";
 			cur = allocate_token(prev,2,semi, SEMI_COLON);
@@ -204,7 +224,7 @@ token_t create_token_list(char* file)
 		else
 		{
 			int count = 1;
-			char* word = checked_malloc( count * sizeof(char));
+			char* word = checked_malloc(count * sizeof(char));
 			word[count - 1] = c;
 			i++;
 			while (file[i] != ' ' && file[i] != '\0' && file[i] != '\n' && file[i] != '\t')
@@ -212,7 +232,7 @@ token_t create_token_list(char* file)
 				count++;
 				word = checked_realloc(word, count * sizeof(char));
 				word[count-1] = file[i];
-				if (file[i] != \n)
+				if (file[i] != '\n')
 					i++;
 			}
 			word[count] = '\0';
@@ -227,28 +247,8 @@ token_t create_token_list(char* file)
  
 }
  
-char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
-{
-	int inputSize = 128;
-	int count = 0;
-	int c;
-	char* stream = (char*)checked_malloc(inputSize*sizeof(char));
- 
-	while ( (c = get_next_byte(get_next_byte_argument)) != -1)
-	{
-		stream[count++] = c;
-		if (count == inputSize)
-		{
-			inputSize += 128;
-			stream = (char*)checked_realloc(stream, inputSize*sizeof(char));
-		}
-	}
-	stream[count] = -1;
-	return stream;
- 
-}
- 
-typedef struct op op_t;
+/* Op stuff  */
+typedef struct op* op_t;
  
 struct op
 {
@@ -270,8 +270,56 @@ int precedence(op_t newOperator, op_t oldOperator)
  
 }
  
-op_t allocate_operator(enum token_type type); //todo
+op_t allocate_operator(enum token_type t)
+{
+	op_t o = checked_malloc(sizeof(struct op));
+	o->type = t;
+	if (t == GREATER_THAN)
+	{
+		o->data = (char*) checked_malloc(2*sizeof(char));
+		o->data = ">\0";
+	}
+	else if (t == LESS_THAN)
+	{
+		o->data = (char*) checked_malloc(2*sizeof(char));
+		o->data = "<\0";
+	}
+	else if (t == PIPE)
+	{
+		o->data = (char*) checked_malloc(2*sizeof(char));
+		o->data = "|\0";
+	}
+	else if (t == OR)
+	{
+		o->data = (char*) checked_malloc(3*sizeof(char));
+		o->data = "||\0";
+	}
+	else if (t == AND)
+	{
+		o->data = (char*) checked_malloc(3*sizeof(char));
+		o->data = "&&\0";
+	}
+
+	return o;
+}
  
+command_t combine_command(command_t c1, command_t c2, op_t o)
+{
+	command_t op_cmd = checked_malloc(sizeof(struct command));
+	if (o->type == AND)
+		op_cmd->type = AND_COMMAND;
+	else if (o->type == OR)
+		op_cmd->type = OR_COMMAND;
+	else if (o->type == PIPE)
+		op_cmd->type = PIPE_COMMAND;
+	
+	op_cmd->input = 0;
+	op_cmd->output = 0;
+	(*op_cmd).u.command[0] = c1;
+	(*op_cmd).u.command[1] = c2;
+	return op_cmd;
+}
+
 command_t make_command_t(token_t head)
 {
 	//initialize stacks.
@@ -281,29 +329,30 @@ command_t make_command_t(token_t head)
 	//start parsing token list.
 	token_t curr = head->next;
 	int numLine = 0;
+
 	while (curr != 0)
 	{
-			
 		//we encounter a simple command.
 		if (curr->type == WORD )
 		{
 			//sequences of 1 or more words are valid for simple commands.
 			int len = strlen(curr->data) + 1;
-			command_t cmd;
+			command_t cmd = checked_malloc(sizeof(struct command));
 			cmd->type = SIMPLE_COMMAND;
 			cmd->input = 0;
 			cmd->output = 0;
-			cmd->word = checked_malloc(sizeof(char*));
+			(*cmd).u.word = checked_malloc(sizeof(char*));
 			int i = 0;
-			cmd->word[i] = checked_malloc(len * sizeof(char));
-			strcpy(cmd->word[i++],curr->data);
+			(*cmd).u.word[i] = checked_malloc(len * sizeof(char));
+			strcpy((*cmd).u.word[i++],curr->data);
+
 			//get rest of command
 			curr = curr->next;
 			while ( curr != 0 && curr->type == WORD )
 			{
-				cmd->word = checked_realloc(cmd->word,(i+1)*sizeof(char*));
-				cmd->word[i] = checked_malloc((strlen(curr->data)+1) * sizeof(char));
-				strcpy(cmd->word[i++],curr->data);
+				(*cmd).u.word = checked_realloc((*cmd).u.word,(i+1)*sizeof(char*));
+				(*cmd).u.word[i] = checked_malloc((strlen(curr->data)+1) * sizeof(char));
+				strcpy((*cmd).u.word[i++],curr->data);
 				curr = curr->next;
 			}
 			stack_push(cmd_stack,cmd);
@@ -312,10 +361,11 @@ command_t make_command_t(token_t head)
  
 		if (curr->type == GREATER_THAN || curr->type == LESS_THAN || curr->type == AND || curr->type == OR || curr->type == PIPE)
 		{
-			op_t new_operator = allocate_operator(enum token_type type);
+			op_t new_operator = allocate_operator(curr->type);
 			op_t top_operator = stack_top(op_stack);
- 
-			if ( precedence(new_operator,top_operator))
+
+			size_t test = stack_count(op_stack);
+			if (precedence(new_operator,top_operator) || !test)
 			{
 				stack_push(op_stack, new_operator);
 			}
@@ -324,11 +374,16 @@ command_t make_command_t(token_t head)
 				while ( top_operator->type != OPEN_PARA && !precedence(new_operator,top_operator))
 				{
 					op_t oper = stack_pop(op_stack);
-					command_t 
- 
-					if (stack_size(op_stack) == 0)
+					command_t two = stack_pop(cmd_stack);
+					command_t one = stack_pop(cmd_stack);
+					command_t new_cmd = combine_command(one, two, oper);
+					stack_push(cmd_stack, new_cmd);
+
+					size_t empty = stack_count(op_stack);
+					if (empty)
 						break;
 				}
+				stack_push(op_stack, new_operator);
 			}
 		}
 		

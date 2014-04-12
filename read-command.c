@@ -401,6 +401,33 @@ command_t make_command_t(token_t head)
 				stack_push(op_stack, new_operator);
 			}
 		}
+
+		//subshell portion
+		if (curr->type == OPEN_PARA)
+		{
+			op_t new_para = allocate_operator(curr->type);
+			stack_push(op_stack, new_para);
+		}
+		else if (curr->type == CLOSED_PARA)
+		{
+			op_t top_t = stack_top(op_stack);
+			while (top_t->type != OPEN_PARA)
+			{
+				command_t cmd1 = stack_pop(cmd_stack);
+				command_t cmd2 = stack_pop(cmd_stack);
+				command_t newcmd = combine_command(cmd1, cmd2, top_t);
+				stack_push(cmd_stack, newcmd);
+				top_t = stack_pop(op_stack);
+			}
+			
+			//create subshell command
+			command_t sub = checked_malloc(sizeof(struct command));
+			//postfix cs32 stuff
+		}
+
+
+
+
 		
 		
 	}
@@ -417,7 +444,7 @@ command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_n
 
 	command_stream_t cs;
 	cs->head = checked_malloc(sizeof(struct command_node));
-	cs->next = 0;
+	cs->head->next = 0;
 	while (1)
 	{
 		

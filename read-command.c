@@ -20,6 +20,8 @@ struct command_node
 	command_node_t next;
 };
  
+typedef struct command_stream* command_stream_t;
+
 struct command_stream
 {
 	command_node_t head;			
@@ -64,7 +66,7 @@ static void* stack_pop(stack_t s)
 static void* stack_top(stack_t s)
 {
     if (!s) error(1, 0, "Null stack point given to stack top");
-    if (s->count == 0) error(1, 0, "Trying to get top from empty stack");
+    if (s->count == 0) return 0;
     return s->data[s->count - 1];
 } 
 static size_t stack_count(stack_t s)
@@ -75,7 +77,7 @@ static size_t stack_count(stack_t s)
  
 int isValidChar(int c)
 {
-	return ( (c >= '0' && c <= '9') || ((c | ('a' - 'A')) - 'a' < 26u) 
+	return ( isalpha(c) || isdigit(c)
 			|| c == '!' || c == '@' || c == '%' || c == '^' || c == '-' || c == '_'
 			|| c == '+' || c == ':' || c == ',' || c == '.' || c == '/');
 }
@@ -153,11 +155,11 @@ token_t create_token_list(char* file)
 	head->prev = 0;
 	head->next = 0;
 	token_t prev = head;
-	//int lineNum = 0;
+	int lineNum = 0;
 	while (file[i] != '\0')
 	{
 		token_t cur;
-		
+		int moveForward = 1;
 		if (file[i] == ' ' || file[i] == '\t')
 		{
 			i++;
@@ -201,6 +203,17 @@ token_t create_token_list(char* file)
 			char* greater = ">\0";
 			cur = allocate_token(prev,2,greater, GREATER_THAN);
 		}
+		else if (c == '&')
+		{
+			if (file[i+1] == '&')
+			{
+				char* and = "&&\0";
+				cur = allocate_token(prev,3,and,AND);
+				i++;
+			}
+			else
+				reportError(lineNum);
+		}
 		else if (c == '|')
 		{
 			if (file[i+1] == '|') 
@@ -232,15 +245,17 @@ token_t create_token_list(char* file)
 				count++;
 				word = checked_realloc(word, count * sizeof(char));
 				word[count-1] = file[i];
-				if (file[i] != '\n')
-					i++;
+				i++;
 			}
+			if (file[i] == '\n')
+				moveForward = 0;
 			word[count] = '\0';
 			cur = allocate_token(prev,count,word,WORD);
 		}
 		
 		prev = cur;
-		i++;	
+		if (moveForward)
+			i++;	
  
 	}
 	return head;
@@ -365,13 +380,13 @@ command_t make_command_t(token_t head)
 			op_t top_operator = stack_top(op_stack);
 
 			size_t test = stack_count(op_stack);
-			if (precedence(new_operator,top_operator) || !test)
+			if (precedence(new_operator,top_operator) && !test)
 			{
 				stack_push(op_stack, new_operator);
 			}
 			else
 			{
-				while ( top_operator->type != OPEN_PARA && !precedence(new_operator,top_operator))
+				while (!precedence(new_operator,top_operator) && top_operator->type != OPEN_PARA)
 				{
 					op_t oper = stack_pop(op_stack);
 					command_t two = stack_pop(cmd_stack);
@@ -399,13 +414,36 @@ command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_n
 {
 	char* file = readFile(get_next_byte, get_next_byte_argument);
 	token_t head = create_token_list(file);
-//	return make_command_stream_t(head);
+
+	command_stream_t cs;
+	cs->head = checked_malloc(sizeof(struct command_node));
+	cs->next = 0;
+	while (1)
+	{
+		
+
+	}
+	
 }
  
  
 command_t
 read_command_stream (command_stream_t s)
 {
-  s->head = 0;
-  return 0;
+	if (s->head == 0)
+		return 0;
+	else
+	{
+		
+	}
+	
+}
+
+
+
+
+int main()
+{
+	printf("hi\n");
+
 }

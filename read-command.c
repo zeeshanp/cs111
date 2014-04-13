@@ -1,449 +1,537 @@
 // UCLA CS 111 Lab 1 command reading
- 
+
+#include "alloc.h"
 #include "command.h"
 #include "command-internals.h"
-#include "alloc.h"
- 
-#include <error.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <ctype.h>
- 
- 
-typedef struct command_node* command_node_t;
- 
-struct command_node
-{
-	command_t data;
-	command_node_t next;
-};
- 
-typedef struct command_stream* command_stream_t;
 
-struct command_stream
-{
-	command_node_t head;			
+#include <error.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+
+
+/* struct/enum definitions */
+
+enum token_type {
+	START,
+	PAREN,
+	LESS_THAN,
+	GREATER_THAN,
+	AND,
+	OR,
+	PIPE,
+	SEMICOLON,
+	WORD
 };
- 
-/* Stack */ 
+
+typedef struct command_stream
+{
+	command_t command;
+	command_stream_t next;
+
+} command_stream;
+
 typedef struct stack* stack_t;
+
 struct stack
 {
-    void** data;
-    size_t count;
-    size_t max_count;
+	command_t data[40];
+	int count;
+}; 
+
+typedef struct token* token_t;
+
+struct token
+{
+	enum token_type type;
+	char* string;
+	int line;
+	token_t next;
+
 };
- 
-static stack_t stack_init()
+
+typedef struct token_list* token_list_t;
+
+struct token_list
 {
-    stack_t s = (stack_t)checked_malloc(sizeof(struct stack));
-    s->max_count = 16;
-    s->count = 0;
-    s->data = (void**)checked_malloc(s->max_count * sizeof(void*));
-    return s;
-}
-static void stack_free(stack_t s)
+	token_t head;
+	token_list_t next;
+};
+
+
+
+/* stack stuff */
+
+void push(stack_t s, command_t cmd)
 {
-    if (!s) error(1, 0, "Null stack point given to stack free");
-    free(s->data);
-    free(s);
-}
-static void stack_push(stack_t s, void* element)
-{
-    if (!s) error(1, 0, "Null stack point given to stack push");
-    if (s->count == s->max_count)
-        s->data = (void**)checked_grow_alloc(s->data, &s->max_count);
-    s->data[s->count++] = element;
-}
-static void* stack_pop(stack_t s)
-{
-    if (!s) error(1, 0, "Null stack point given to stack pop");
-    if (s->count == 0) error(1, 0, "Trying to pop from empty stack");
-    return s->data[--s->count];
-}
-static void* stack_top(stack_t s)
-{
-    if (!s) error(1, 0, "Null stack point given to stack top");
-    if (s->count == 0) return 0;
-    return s->data[s->count - 1];
-} 
-static size_t stack_count(stack_t s)
-{
-    if (!s) error(1, 0, "Null stack point given to stack count");
-    return s->count;
-}
- 
-int isValidChar(int c)
-{
-	return ( isalpha(c) || isdigit(c)
-			|| c == '!' || c == '@' || c == '%' || c == '^' || c == '-' || c == '_'
-			|| c == '+' || c == ':' || c == ',' || c == '.' || c == '/');
+	s->data[s->count] = cmd;
+	(s->count)++;
 }
 
-char* readFile(int (*get_next_byte) (void *), void* get_next_byte_argument)
+command_t top(stack_t s)
+{
+	return s->data[s->count - 1];
+}
+
+
+command_t pop(stack_t s)
+{
+	return s->data[--(s->count)];
+}
+
+
+int empty(stack_t s)
+{
+	return (s->count == 0);
+}
+
+int size(stack_t s)
+{
+	return s->count;
+}
+
+/* reads file into stream, ignoring whitespace and comments . */
+int readFile(char* stream, int (*get_next_byte) (void *), void* get_next_byte_argument)
 {
 	int inputSize = 128;
 	int count = 0;
 	int c;
-	char* stream = (char*)checked_malloc(inputSize*sizeof(char));
- 
+	stream = (char*)checked_malloc(inputSize*sizeof(char));
+	
 	while ( (c = get_next_byte(get_next_byte_argument)) != -1)
 	{
-		stream[count++] = c;
-		if (count == inputSize)
+		if (c == '#')
 		{
-			inputSize += 128;
-			stream = (char*)checked_realloc(stream, inputSize*sizeof(char));
+			while (c != -1 && c != '\n')
+				c = get_next_byte(get_next_byte_argument);
 		}
+
+		if (c == ' ' || c == '\t')
+		{
+			while (c == ' ' || c == '\t')
+				c = get_next_byte(get_next_byte_argument);
+		}
+
+		if (c != -1)
+		{
+			stream[count++] = c;
+			if (count == inputSize)
+			{
+				inputSize += 128;
+				stream = checked_grow_alloc(stream, &inputSize);
+			}
+		}
+
 	}
-	stream[count] = -1;
-	return stream;
+	return count;
  
 }
 
-/*  Tokenizer stuff */
-enum token_type
+void reportError(int lineNum, int err_msg)
 {
-	PIPE,
-	SEMI_COLON,
-	NEWLINE,
-	AND,
-	OR,
-	LESS_THAN,
-	GREATER_THAN,
-	OPEN_PARA,
-	CLOSE_PARA,
-	WORD, 
-};
- 
-typedef struct token* token_t;
- 
-struct token
-{
-	char* data;
-	enum token_type type;
-	token_t next;
-	token_t prev;
-};
- 
-token_t allocate_token(token_t prev, int dataSize, char* data, enum token_type type)
+	switch (err_msg)
+	{
+	case 1: error(1,0, "Line %d: Extra ) found.", lineNum); break;
+	case 2: error(1,0, "Line %d: Missing &.", lineNum); break;
+	case 3: error(1,0, "Line %d: Need command after redirect.", lineNum); break;
+	case 4: error(1,0, "Line %d: Invalid Character.", lineNum); break;
+	case 5: error(1,0, "Line %d: Missing ).",lineNum); break;
+	case 6: error(1,0, "Line %d: Two Outputs.", lineNum); break;
+	default: error(1,0,"Line %d: Unknown Error.", lineNum); break;
+	};
+}
+
+token_t allocate_token(enum token_type type, char* data, int line)
 {
 	token_t t = checked_malloc(sizeof(struct token));
-	prev->next = t;
-	t->prev = prev;
-	t->data =(char*)checked_malloc(dataSize*sizeof(char));
-	strcpy(t->data,data);
 	t->type = type;
+	t->line = line;
+	t->string = data;
 	t->next = 0;
 	return t;
 }
- 
-void reportError(int linenum)
+
+int isValid(char c)
 {
-	fprintf(stderr, "Error Parsing: Line %d.", linenum);
-	exit(1);
+	return ((c >= '0' && c <= '9') || isalpha(c) || c == '!' || c == '@'
+		|| c == '%' || c == '^'	|| c == '-' || c == '_'	|| c == '+' || c == ':'
+		|| c == ',' || c == '.'	|| c == '/');
 }
 
-token_t create_token_list(char* file)
+int merge(stack_t ops, stack_t operands)
 {
+	if (size(operands) < 2 || size(ops) == 0)
+		return 0;
+
+	command_t right = pop(operands);
+	command_t left = pop(operands);
+	command_t cmd = pop(ops);
+	cmd->u.command[0] = left;
+	cmd->u.command[1] = right;
+	push(operands, cmd);
+
+	return 1;
+}
+
+
+token_list_t make_tokens(char* stream, int count)
+{
+	token_t head = allocate_token(START, 0, 0);
+	token_t curr = head;
+	
+	token_list_t t = checked_malloc(sizeof(struct token_list));
+	token_list_t curr_list = t;
+	curr_list->head = head;
+
+	int lineNum = 1;
 	int i = 0;
- 
-	token_t head = checked_malloc(sizeof(struct token));
-	head->data = 0;
-	head->prev = 0;
-	head->next = 0;
-	token_t prev = head;
-	int lineNum = 0;
-	while (file[i] != '\0')
+	char c = stream[i];
+	while (i < count)
 	{
-		token_t cur;
-		int moveForward = 1;
-		if (file[i] == ' ' || file[i] == '\t')
+		if (c == '(')
 		{
-			i++;
-			continue;
-		}
-		if (file[i] == '#')
-		{
-			while (file[i] != '\n' || file[i] != '\0')
-				i++;
-		}
- 
-		char c = file[i];
-		
-		if (c == '&' && file[i+1] == '&')
-		{
-			char* and = "&&\0";
-			cur = allocate_token(prev,3,and, AND);
-		}
-		else if (c == ';')
-		{
-			char* semi = ";\0";
-			cur = allocate_token(prev,2,semi, SEMI_COLON);
-		}
-		else if (c == '(')
-		{
-			char* open = "(\0";
-			cur = allocate_token(prev,2,open, OPEN_PARA);
+			int subshell_line = lineNum;
+			int level = 1;
+			int count = 0;
+			size_t subshell_size = 10;
+			char* subshell = checked_malloc(subshell_size);
+
+			while (level > 0) 
+			{
+				c = stream[++i];
+				if (i == count) 
+				{
+					reportError(lineNum,5);
+					return NULL;
+				}
+
+				if (c == '\n') 
+				{
+					c = ';';
+					lineNum++;
+				}
+				else if (c == '(')
+					level++;
+				else if (c == ')')
+				{
+					if (--level == 0)
+					{
+						c = stream[++i];
+						break;
+					}
+				}
+				subshell[count] = c;
+				count++;
+
+				if (count == subshell_size)
+				{
+					subshell_size = subshell_size * 2;
+					subshell = checked_grow_alloc (subshell, &subshell_size);
+				}
+			}
+			curr->next = allocate_token(PAREN, subshell, subshell_line);
+			curr = curr->next;
 		}
 		else if (c == ')')
 		{
-			char* close = ")\0";
-			cur = allocate_token(prev,2,close, CLOSE_PARA);
-		}
-		else if (c == '<')
-		{
-			char* less = "<\0";
-			cur = allocate_token(prev,2,less, LESS_THAN);
-		}
-		else if (c == '>')
-		{
-			char* greater = ">\0";
-			cur = allocate_token(prev,2,greater, GREATER_THAN);
+			reportError(lineNum, 1);
+			return 0;
 		}
 		else if (c == '&')
 		{
-			if (file[i+1] == '&')
+			c = stream[++i];
+			if ( i != count && c == '&')
 			{
-				char* and = "&&\0";
-				cur = allocate_token(prev,3,and,AND);
-				i++;
+				curr->next = allocate_token(AND, 0, lineNum);
+				curr = curr->next;
+				c = stream[++i];
 			}
 			else
-				reportError(lineNum);
+			{
+				reportError(lineNum,2);
+				return 0;
+			}
 		}
 		else if (c == '|')
 		{
-			if (file[i+1] == '|') 
+			c = stream[++i];
+			if (i != count && c == '|')
 			{
-				char* or = "||\0";
-				cur = allocate_token(prev,3,or,OR); 
-				i++;
+				curr->next = allocate_token(OR,0,lineNum);
+				curr = curr->next;
+				c = stream[++i];
 			}
 			else
 			{
-				char* pipe = "|\0";
-				cur = allocate_token(prev,2,pipe,PIPE);
+				curr->next = allocate_token(PIPE,0,lineNum);
+				curr = curr->next;
 			}
+		}
+		else if (c == '>')
+		{
+			curr->next = allocate_token(GREATER_THAN,0,lineNum);
+			c = stream[++i];
+		}
+		else if (c == '<')
+		{
+			curr->next = allocate_token(LESS_THAN,0,lineNum);
+			c = stream[++i];
+		}
+		else if (c == ';')
+		{
+			curr->next = allocate_token(SEMICOLON,0,lineNum);
+			c = stream[++i];
 		}
 		else if (c == '\n')
 		{
-			char* newline = "\n\0";
-			cur = allocate_token(prev,2,newline,NEWLINE);
-			
+			lineNum++;
+			if (curr->type == PAREN || curr->type == WORD)
+			{
+				curr_list->next = checked_malloc(sizeof(struct token_list));
+				curr_list = curr_list->next;
+				curr_list->head = allocate_token(START,0,0);
+				curr = curr_list->head;
+			}
+			else if (curr->type == LESS_THAN || curr->type == GREATER_THAN)
+			{
+				reportError(lineNum, 3);
+				return 0;
+			}
+			c = stream[++i];
+		}
+		else if (isValid(c))
+		{
+			int len = 0;
+			size_t buff = 16;
+			char* word = checked_malloc(buff * sizeof(char));
+			do
+			{
+				word[len] = c;
+				len++;
+				if (len == buff)
+				{
+					buff *= 2;
+					word = checked_grow_alloc(word,&buff);
+				}
+				c = stream[++i];
+
+			} while (isValid(c) && i < count);
+
+			curr->next = allocate_token(WORD,word, lineNum);
+			curr = curr->next;
 		}
 		else
 		{
-			int count = 1;
-			char* word = checked_malloc(count * sizeof(char));
-			word[count - 1] = c;
-			i++;
-			while (file[i] != ' ' && file[i] != '\0' && file[i] != '\n' && file[i] != '\t')
-			{
-				count++;
-				word = checked_realloc(word, count * sizeof(char));
-				word[count-1] = file[i];
-				i++;
-			}
-			if (file[i] == '\n')
-				moveForward = 0;
-			word[count] = '\0';
-			cur = allocate_token(prev,count,word,WORD);
+			reportError(lineNum,4);
+			return 0;
 		}
 		
-		prev = cur;
-		if (moveForward)
-			i++;	
- 
 	}
-	return head;
- 
-}
- 
-/* Op stuff  */
-typedef struct op* op_t;
- 
-struct op
-{
-	char* data;
-	enum token_type type;
-};
- 
-int precedence(op_t newOperator, op_t oldOperator)
-{
-	//return true if new > old
-	if (newOperator->type == PIPE)
-		return ( oldOperator->type == GREATER_THAN || oldOperator->type == LESS_THAN );
- 
-	if (newOperator->type == GREATER_THAN || newOperator->type == LESS_THAN)
-		return (oldOperator->type != GREATER_THAN && oldOperator->type != LESS_THAN);
- 
-	if (newOperator->type == AND || newOperator->type == OR)
-		return (oldOperator->type != AND || oldOperator->type != OR);
- 
-}
- 
-op_t allocate_operator(enum token_type t)
-{
-	op_t o = checked_malloc(sizeof(struct op));
-	o->type = t;
-	if (t == GREATER_THAN)
-	{
-		o->data = (char*) checked_malloc(2*sizeof(char));
-		o->data = ">\0";
-	}
-	else if (t == LESS_THAN)
-	{
-		o->data = (char*) checked_malloc(2*sizeof(char));
-		o->data = "<\0";
-	}
-	else if (t == PIPE)
-	{
-		o->data = (char*) checked_malloc(2*sizeof(char));
-		o->data = "|\0";
-	}
-	else if (t == OR)
-	{
-		o->data = (char*) checked_malloc(3*sizeof(char));
-		o->data = "||\0";
-	}
-	else if (t == AND)
-	{
-		o->data = (char*) checked_malloc(3*sizeof(char));
-		o->data = "&&\0";
-	}
-
-	return o;
-}
- 
-command_t combine_command(command_t c1, command_t c2, op_t o)
-{
-	command_t op_cmd = checked_malloc(sizeof(struct command));
-	if (o->type == AND)
-		op_cmd->type = AND_COMMAND;
-	else if (o->type == OR)
-		op_cmd->type = OR_COMMAND;
-	else if (o->type == PIPE)
-		op_cmd->type = PIPE_COMMAND;
-	
-	op_cmd->input = 0;
-	op_cmd->output = 0;
-	(*op_cmd).u.command[0] = c1;
-	(*op_cmd).u.command[1] = c2;
-	return op_cmd;
+	return t;
 }
 
-command_t make_command_t(token_t head)
+command_t make_command_tree(token_t head)
 {
-	//initialize stacks.
-	stack_t cmd_stack = stack_init();
-	stack_t op_stack = stack_init();
- 
-	//start parsing token list.
-	token_t curr = head->next;
-	int numLine = 0;
+	token_t curr = head;
+	int lineNum = curr->line;
 
-	while (curr != 0)
+	stack_t ops = checked_malloc(sizeof(struct stack));
+	stack_t operands = checked_malloc(sizeof(struct stack));
+	operands->count = 0;
+	ops->count = 0;
+
+	command_t prev_cmd = 0;
+	command_t curr_cmd;
+
+	do 
 	{
-		//we encounter a simple command.
-		if (curr->type == WORD )
+		if(curr->type != LESS_THAN && curr->type != GREATER_THAN)
+			curr_cmd = checked_malloc(sizeof(struct command));
+
+		switch (curr->type)
 		{
-			//sequences of 1 or more words are valid for simple commands.
-			int len = strlen(curr->data) + 1;
-			command_t cmd = checked_malloc(sizeof(struct command));
-			cmd->type = SIMPLE_COMMAND;
-			cmd->input = 0;
-			cmd->output = 0;
-			(*cmd).u.word = checked_malloc(sizeof(char*));
-			int i = 0;
-			(*cmd).u.word[i] = checked_malloc(len * sizeof(char));
-			strcpy((*cmd).u.word[i++],curr->data);
-
-			//get rest of command
-			curr = curr->next;
-			while ( curr != 0 && curr->type == WORD )
-			{
-				(*cmd).u.word = checked_realloc((*cmd).u.word,(i+1)*sizeof(char*));
-				(*cmd).u.word[i] = checked_malloc((strlen(curr->data)+1) * sizeof(char));
-				strcpy((*cmd).u.word[i++],curr->data);
-				curr = curr->next;
-			}
-			stack_push(cmd_stack,cmd);
-			continue;
-		}
- 
-		if (curr->type == GREATER_THAN || curr->type == LESS_THAN || curr->type == AND || curr->type == OR || curr->type == PIPE)
-		{
-			op_t new_operator = allocate_operator(curr->type);
-			op_t top_operator = stack_top(op_stack);
-
-			size_t test = stack_count(op_stack);
-			if (precedence(new_operator,top_operator) && !test)
-			{
-				stack_push(op_stack, new_operator);
-			}
-			else
-			{
-				while (!precedence(new_operator,top_operator) && top_operator->type != OPEN_PARA)
+			case PAREN:
+				curr_cmd->type = SUBSHELL_COMMAND;
+				curr_cmd->u.subshell_command = make_command_tree(make_tokens(curr->string, strlen(curr->string))->head);
+				push(operands, curr_cmd);
+				break;
+			case LESS_THAN:
+				if (prev_cmd == NULL ||	(prev_cmd->type != SIMPLE_COMMAND && prev_cmd->type != SUBSHELL_COMMAND))
 				{
-					op_t oper = stack_pop(op_stack);
-					command_t two = stack_pop(cmd_stack);
-					command_t one = stack_pop(cmd_stack);
-					command_t new_cmd = combine_command(one, two, oper);
-					stack_push(cmd_stack, new_cmd);
-
-					size_t empty = stack_count(op_stack);
-					if (empty)
-						break;
+					reportError(lineNum, 2);
+					return NULL;
 				}
-				stack_push(op_stack, new_operator);
-			}
+				else if (prev_cmd->output != NULL)
+				{
+					reportError(lineNum, 6);
+					return NULL;
+				}
+				else if (prev_cmd->input != NULL) {
+					reportError(lineNum, 6);
+					return NULL;
+				}
+				curr = curr->next;
+				if (curr->type == WORD)
+					prev_cmd->input = curr->string;
+				else
+				{
+					reportError(lineNum, 2);
+					return NULL;
+				}
+				break;
+			case GREATER_THAN:
+				if (prev_cmd == NULL ||	(prev_cmd->type != SIMPLE_COMMAND && prev_cmd->type != SUBSHELL_COMMAND)) {
+					reportError(lineNum, 2);
+					return NULL;
+				}
+				else if (prev_cmd->output != NULL) {
+					reportError(lineNum, 6);					
+					return NULL;
+				}
+
+				curr = curr->next;
+				if (curr->type == WORD)
+					prev_cmd->output = curr->string;
+				else
+				{
+					reportError(lineNum, 6);
+					return NULL;
+				}
+				break;
+			case AND:
+			case OR:
+				curr_cmd->type = (curr->type == AND ? AND_COMMAND : OR_COMMAND);
+								
+				if (!empty(ops) && (top(ops)->type == PIPE_COMMAND || top(ops)->type == OR_COMMAND ||
+						top(ops)->type == AND_COMMAND))
+					if(!merge(ops, operands))
+					{
+						reportError(lineNum, 10);
+						return NULL;
+					}
+				push(ops, curr_cmd);
+				break;
+			case PIPE:
+				curr_cmd->type = PIPE_COMMAND;
+				if (!empty(ops) && top(ops)->type == PIPE_COMMAND)
+					if (!merge(ops, operands)) 
+					{
+						reportError(lineNum, 10);
+						return NULL;
+					}
+				push(ops, curr_cmd);
+				break;
+
+			case SEMICOLON:
+				curr_cmd->type = SEQUENCE_COMMAND;
+				if (!empty(ops))
+					if(!merge(ops, operands)) {
+						reportError(lineNum, 10);
+						return NULL;
+					}
+				push(ops, curr_cmd);
+				break;
+
+			case WORD:
+				curr_cmd->type = SIMPLE_COMMAND;
+
+				int num_words = 1; 
+				token_t cur_token = curr;
+				while (cur_token->next != NULL && cur_token->next->type == WORD)
+				{
+					num_words++;
+					cur_token = cur_token->next;
+				}
+
+				curr_cmd->u.word = checked_malloc((num_words + 1) * sizeof(char*));
+				int i;
+				for (i = 0; i < num_words-1; i++) {
+					curr_cmd->u.word[i] = curr->string;
+					curr = curr->next;
+				}
+				curr_cmd->u.word[i] = curr->string;
+				curr_cmd->u.word[num_words] = 0;
+				push(operands, curr_cmd);
+				break;
+			default:
+				break;
+		};
+				
+		prev_cmd = curr_cmd;
+	} while(curr != NULL && (curr = curr->next) != NULL);
+
+	
+	while(size(ops) != 0)
+		if (!merge(ops, operands)) 
+		{
+			reportError(lineNum, 10);
+			return NULL;
 		}
-		
-		
-	}
-	stack_free(cmd_stack);
-	stack_free(op_stack);
-}
- 
- 
- 
-command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_next_byte_argument)
-{
-	char* file = readFile(get_next_byte, get_next_byte_argument);
-	token_t head = create_token_list(file);
 
-	command_stream_t cs;
-	cs->head = checked_malloc(sizeof(struct command_node));
-	cs->next = 0;
-	while (1)
+	if (size(ops) != 1) 
 	{
-		
-
+		reportError(lineNum, 10);
+		return NULL;
 	}
-	
+	return pop(operands);
 }
- 
- 
-command_t
-read_command_stream (command_stream_t s)
+
+
+
+command_stream_t make_command_tree_root(token_list_t t)
 {
-	if (s->head == 0)
+	token_list_t curr_list = t;
+
+	command_stream_t head, curr, prev;
+	head = 0;
+	curr = 0;
+	prev = 0;
+
+	while (curr_list != 0 && curr_list->head->next != 0)
+	{
+		curr = checked_malloc(sizeof(command_stream));
+		curr->command = make_command_tree(curr_list->head->next);
+
+		if (!head)
+		{ 
+			head = curr;
+			prev = head;
+		}
+		else
+		{
+			prev->next = curr;
+			prev = curr;
+		}
+
+		curr_list = curr_list->next;
+	}
+
+	return head;
+}
+
+
+command_stream_t make_command_stream(int (*get_next_byte) (void *), void *get_next_byte_argument)
+{
+	char* stream;
+	int count = readFile(stream, get_next_byte, get_next_byte_argument);
+	token_list_t t = make_tokens(stream, count);
+	return make_command_tree_root(t);
+}
+
+
+command_t read_command_stream(command_stream_t s)
+{
+	if (s == 0 || s->command == 0)
 		return 0;
-	else
+	command_t curr = s->command;
+	if (s->next != 0)
 	{
-		
+		command_stream_t next = s->next;
+		s->command = s->next->command;
+		s->next = s->next->next;	
 	}
-	
-}
+	else
+		s->command = 0;
 
-
-
-
-int main()
-{
-	printf("hi\n");
-
+	return curr;
 }

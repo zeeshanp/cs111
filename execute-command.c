@@ -20,7 +20,7 @@ void executingAnd(command_t c);
 void executingOr(command_t c);
 void executingSequence(command_t c);
 void executingPipe(command_t c);
-void execute_switch(command_t c);
+int execute_switch(command_t c);
 
 
 int command_status (command_t c)
@@ -50,7 +50,7 @@ void executingSubshell(command_t c)
     			error(1, errno, "Error with dup2 on %s.", c->output);
     	}
     	
-    	status = execute_switch(c->u.subshell_command);
+    	execute_switch(c->u.subshell_command);
     	
     	if (c->input != NULL)
     		close(fp_in);
@@ -63,7 +63,7 @@ void executingSubshell(command_t c)
 	{
 		//back in parent process.
 		waitpid(child, &status, 0);
-		c->status = WEXISTSTATUS(status);
+		c->status = WEXITSTATUS(status);
 	}
 
 
@@ -135,7 +135,7 @@ void executingAnd(command_t c)
 }
 
 
-void execute_switch(command_t c)
+int execute_switch(command_t c)
 {
 	switch(c->type)
 	{
@@ -160,9 +160,10 @@ void execute_switch(command_t c)
 	default:
 		error(1, 0, "Not a valid command");
 	}
+	return c->status;
 }
 
-int executingPipe(command_t c)
+void executingPipe(command_t c)
 {
 	pid_t returnedPid;
 	pid_t firstPid;

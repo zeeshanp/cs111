@@ -9,7 +9,7 @@
 typedef struct stack* stack_t;
 struct stack
 {
-	void** data; //2d array so we dont worry about sizeof()
+	void** data;
 	size_t count;
 	size_t max;
 };
@@ -67,7 +67,6 @@ int isValid(char c)
 		c == '^' || c == '_');
 }
 
-
 command_t allocate()
 {
 	command_t cmd = (command_t) checked_malloc(sizeof(struct command));
@@ -76,13 +75,13 @@ command_t allocate()
 	return cmd;
 }
 
-void* error_msg(int* err)
+void* error_ret(int* err)
 {
 	*err = 1;
 	return 0;
 }
 
-//returns true if prec(a) > prec(b)
+
 char precedence(command_t a, command_t b)
 {
 	char p;
@@ -100,7 +99,6 @@ char precedence(command_t a, command_t b)
 	return 0;
 }
 
-//take in a word and add it to token stream
 size_t word(char** c, char* buffer, size_t* size, size_t* max)
 {
 	size_t read = 0;
@@ -122,7 +120,6 @@ size_t word(char** c, char* buffer, size_t* size, size_t* max)
     return read;
 }
 
-//form simple commands at leaf of trees
 command_t simplecommand(char** c, int* err)
 {
     while (**c == ' ') (*c)++;
@@ -154,7 +151,7 @@ command_t simplecommand(char** c, int* err)
     while (1)
     {
         size_t len = word(c, buffer, &size, &max);
-        if (len != 0)
+        if (len > 0)
 		{
             buffer[size] = '\0';
             size++;
@@ -162,41 +159,38 @@ command_t simplecommand(char** c, int* err)
         }
         
         char ch = **c;
-		//skip spaces
         if (ch == ' ') 
 		{
             while (**c == ' ') (*c)++;
         }
-		//if we come to redirect make new word for input
         else if (ch == '<')
         {
             if (size == 0)
-				error_msg(err);
+				error_ret(err);
             
 			(*c)++;
             size_t read = word(c, inputbuffer, &inputsize, &inputmax);
             
 			if (read == 0)
-				error_msg(err);
+				error_ret(err);
             
 			inputbuffer[inputsize] = '\0';
             inputsize++;
             cmd->input = inputbuffer;
             
-			//skip spaces
 			while (**c == ' ')
 				(*c)++;
         }
-        else if (ch == '>') //make output word
+        else if (ch == '>')
         {
             if (size == 0)
-				error_msg(err);
+				error_ret(err);
             
 			(*c)++;
             size_t read = word(c, outputbuffer, &outputsize, &outputmax);
             
 			if (read == 0)
-				error_msg(err);
+				error_ret(err);
             
 			outputbuffer[outputsize] = '\0';
             outputsize++;
@@ -251,7 +245,7 @@ command_t rootcommand(char** c, char top, int* err)
 	command_t cmd = simplecommand(c, err);
     
 	if (*err)
-		return error_msg(err);
+		return error_ret(err);
     
 	if (!cmd)
 	{
@@ -263,15 +257,15 @@ command_t rootcommand(char** c, char top, int* err)
             cmd->u.subshell_command = rootcommand(c, 0, err);
             
 			if (!cmd->u.subshell_command)
-				return error_msg(err);
+				return error_ret(err);
         }
         else
-			return error_msg(err);
+			return error_ret(err);
     }
 
     stack_push(cmd_stack, cmd);
     
-    while(1)
+    for (;;)
 	 {
         if (**c == '#')
 			while (**c && **c != '\n')
@@ -285,7 +279,7 @@ command_t rootcommand(char** c, char top, int* err)
 		{
             (*c)++;
             if (*(*c)++ != '&') 
-				return error_msg(err);
+				return error_ret(err);
             o->type = AND_COMMAND;
         }
         else if (ch == '|') 
@@ -316,7 +310,7 @@ command_t rootcommand(char** c, char top, int* err)
             
             if (!**c || **c == '\n') 
 			{
-                if (!top) return error_msg(err);
+                if (!top) return error_ret(err);
                 break;
             }
             o->type = SEQUENCE_COMMAND;
@@ -324,7 +318,7 @@ command_t rootcommand(char** c, char top, int* err)
         else if (ch == ')') 
 		{
             if (top)
-				return error_msg(err);
+				return error_ret(err);
             (*c)++;
             
 			while (**c == ' ') 
@@ -334,11 +328,11 @@ command_t rootcommand(char** c, char top, int* err)
         else if (!ch) 
 		{
             if (!top)
-				return error_msg(err);
+				return error_ret(err);
             break;
         }
         else 
-			return error_msg(err);
+			return error_ret(err);
         
        
         while (stack_count(op_stack) != 0 && !precedence((command_t)stack_top, o)) 
@@ -366,7 +360,7 @@ command_t rootcommand(char** c, char top, int* err)
         command_t next = simplecommand(c, err);
         
 		if (*err)
-			return error_msg(err);
+			return error_ret(err);
        
 		if (!next) 
 		{
@@ -377,10 +371,9 @@ command_t rootcommand(char** c, char top, int* err)
                 next->type = SUBSHELL_COMMAND;
                 next->u.subshell_command = rootcommand(c, 0, err);
                 if (!next->u.subshell_command)
-					return error_msg(err);
+					return error_ret(err);
             }
-            else 
-				return error_msg(err);
+            else return error_ret(err);
         }
         stack_push(cmd_stack, next);
     }
@@ -399,7 +392,7 @@ command_t rootcommand(char** c, char top, int* err)
     }
 
     if (stack_count(op_stack) != 0 || stack_count(cmd_stack) != 1)
-		return error_msg(err);
+		return error_ret(err);
     
     cmd = stack_pop(cmd_stack);
     
@@ -443,8 +436,7 @@ command_stream_t make_command_stream (int (*get_next_byte) (void *), void *get_n
 	cs->head->command = 0;
 	cs->head->next = 0;
     cs->head->command = rootcommand(&ptr, 1, &err);
-    //grab error code
-	if (err)
+    if (err)
 	{
         int line = 1;
         for (marker = buffer; marker != ptr; marker++)

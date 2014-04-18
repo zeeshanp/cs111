@@ -14,13 +14,13 @@
 #include "command-internals.h"
 
 
-int executingSimple(command_t c);
-int executingSubshell(command_t c);
-int executingAnd(command_t c);
-int executingOr(command_t c);
-int executingSequence(command_t c);
-int executingPipe(command_t c);
-int execute_switch(command_t c);
+void executingSimple(command_t c);
+void executingSubshell(command_t c);
+void executingAnd(command_t c);
+void executingOr(command_t c);
+void executingSequence(command_t c);
+void executingPipe(command_t c);
+void execute_switch(command_t c);
 
 
 int command_status (command_t c)
@@ -128,18 +128,14 @@ void executingAnd(command_t c)
 {
 	int status = execute_switch(c->u.command[0]);
 	
-	if (status == 0) //success;
-	{
+	if (!status) //success;
 		c->status = execute_switch(c->u.command[1]);
-	}
 	else
-	{
-		c->status = status;
-	}
+		c->status = status;	
 }
 
 
-int execute_switch(command_t c)
+void execute_switch(command_t c)
 {
 	switch(c->type)
 	{
@@ -164,8 +160,6 @@ int execute_switch(command_t c)
 	default:
 		error(1, 0, "Not a valid command");
 	}
-
-	return c->status;
 }
 
 int executingPipe(command_t c)

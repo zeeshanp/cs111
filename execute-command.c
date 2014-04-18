@@ -1,8 +1,5 @@
 // UCLA CS 111 Lab 1 command execution
 
-#include "command.h"
-#include "command-internals.h"
-
 #include <error.h>
 #include <unistd.h>
 #include <error.h>
@@ -13,13 +10,17 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-void executingSimple(command_t c);
-void executingSubshell(command_t c);
-void executingAnd(command_t c);
-void executingOr(command_t c);
-void executingSequence(command_t c);
-void executingPipe(command_t c);
-void execute_switch(command_t c);
+#include "command.h"
+#include "command-internals.h"
+
+
+int executingSimple(command_t c);
+int executingSubshell(command_t c);
+int executingAnd(command_t c);
+int executingOr(command_t c);
+int executingSequence(command_t c);
+int executingPipe(command_t c);
+int execute_switch(command_t c);
 
 
 int command_status (command_t c)
@@ -29,70 +30,116 @@ int command_status (command_t c)
 
 void executingSubshell(command_t c)
 {
-	execute_switch(c->u.subshell_command);
+	int status;
+	int child = fork();
+	if (child == 0)
+	{
+		int fp_in,fp_out;
+		if (c->input != NULL)
+		{
+			if ( (fp_in = open(c->input,O_RDONLY)) < 0)
+				error(1, errno, "Unable to open %s.", c->input);
+			if (  dup2(fp_in,0) < 0 )
+				error(1, errno, "Error with dup2 on %s.", c->input);
+		}
+		if (c->output != NULL)
+    	{
+    		if ( (fp_out = open(c->output, O_RDWR|O_TRUNC|O_CREAT,0644)) < 0 )
+    			error(1, errno, "Unable to write to %s.", c->output);
+    		if ( dup2(fp_out,1) < 0 )
+    			error(1, errno, "Error with dup2 on %s.", c->output);
+    	}
+    	
+    	status = execute_switch(c->u.subshell_command);
+    	
+    	if (c->input != NULL)
+    		close(fp_in);
+    	if (c->output != NULL)
+    		close(fp_out);
+
+    	_exit(status);
+	}
+	else
+	{
+		//back in parent process.
+		waitpid(child, &status, 0);
+		c->status = WEXISTSTATUS(status);
+	}
+
+
 }
 
 void executingSequence(command_t c)
 {
 	execute_switch(c->u.command[0]);
-	execute_switch(c->u.command[1]);
-	c->status = c->u.command[1]->status;
+	c->status = execute_switch(c->u.command[1]);
 }
 
 void executingSimple(command_t c)
 {
-    if (c->output != NULL)  
+	int status;
+    int child = fork();
+    if (child == 0)
     {
-    	int fp;
-    	if ( (fp = open(c->output, O_RDWR | O_CREAT | O_TRUNC, 0644)) < 0)
+    	int fp_in, fp_out;
+    	if (c->input != NULL)
     	{
-    		error(1,errno, "error creating file %s.", c->output);
+    		
+    		if ( (fp_in = open(c->input, O_RDONLY)) < 0 )
+    			error(1, errno, "Unable to open %s.", c->input);
+    		if ( dup2(fp_in,0) < 0 )
+    			error(1, errno, "Error with dup2 on %s.", c->input);
     	}
-    	if (dup2(fp,1) < 0)
+    	if (c->output != NULL)
     	{
-    		error(1, errno, "error with dup2: output");
+    		if ( (fp_out = open(c->output, O_RDWR|O_TRUNC|O_CREAT,0644)) < 0 )
+    			error(1, errno, "Unable to write to %s.", c->output);
+    		if ( dup2(fp_out,1) < 0 )
+    			error(1, errno, "Error with dup2 on %s.", c->output);
     	}
+    	execvp(c->u.word[0], c->u.word);
+    	error(1, errno, "Could not execute: %s.", c->u.word[0]);
     }
-    if (c->input != NULL)
+    else
     {
-    	int fp;
-    	if ( (fp = open(c->input, O_RDWR)) < 0)
-    	{
-    		error(1, errno, "error opening %s", c->input);
-    	}
-    	if (dup2(fp,0) < 0)
-    	{
-    		error(1, errno, "error with dup2 on input file: %s", c->input);
-    	}
+    	//parent process.
+    	waitpid(child,&status,0);    	
     }
-    c->status = 0;
-    execvp(c->u.word[0],c->u.word);
-    //if we get here, error.
-    error(1, errno, "error executing: %s", c->u.word[0]);
+    c->status = WEXITSTATUS(status);
 }
 
 
 void executingOr(command_t c)
 {
 	//execute the left command.
-	execute_switch(c->u.command[0]);
+	int status = execute_switch(c->u.command[0]);
 
 	//if failed
-	if (c->u.command[0]->status)  
-		execute_switch(c->u.command[1]);
+	if (status != 0)  
+	{
+		c->status = execute_switch(c->u.command[1]);
+	}
+	else
+		c->status = status;
 }
 
 
 void executingAnd(command_t c)
 {
-	execute_switch(c->u.command[0]);
-	if (!c->u.command[0]->status)
+	int status = execute_switch(c->u.command[0]);
+	
+	if (status == 0) //success;
 	{
-		execute_switch(c->u.command[1]);
+		c->status = execute_switch(c->u.command[1]);
+	}
+	else
+	{
+		c->status = status;
 	}
 }
 
-void execute_switch(command_t c)
+
+int execute_switch(command_t c)
 {
 	switch(c->type)
 	{
@@ -117,9 +164,11 @@ void execute_switch(command_t c)
 	default:
 		error(1, 0, "Not a valid command");
 	}
+
+	return c->status;
 }
 
-void executingPipe(command_t c)
+int executingPipe(command_t c)
 {
 	pid_t returnedPid;
 	pid_t firstPid;
@@ -205,9 +254,6 @@ void executingPipe(command_t c)
 void
 execute_command (command_t c, bool time_travel)
 {
-  
-	if (time_travel == false)
-	{
+  	if (!time_travel)
 	    execute_switch(c);
-	}
 }

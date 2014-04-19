@@ -13,7 +13,7 @@
 #include "command.h"
 #include "command-internals.h"
 
-
+//function declarations
 void executingSimple(command_t c);
 void executingSubshell(command_t c);
 void executingAnd(command_t c);

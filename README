@@ -1,8 +1,14 @@
 This is a skeleton for CS 111 Lab 1.
 
-Lab 1a
+Lab 1b
 
 Kevin Sheu: 204160159
 
 Zeeshan Pirzada: 404144615
+
+
+KNOWN ERRORS:
+-Our shell does not handle subshell redirects properly, 
+ the script (a && b) > c.txt will give a syntax error.
+
 

@@ -9,11 +9,13 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <string.h>
 
 #include "command.h"
 #include "command-internals.h"
 
-//function declarations
+/* executing commands */
+
 void executingSimple(command_t c);
 void executingSubshell(command_t c);
 void executingAnd(command_t c);
@@ -23,10 +25,6 @@ void executingPipe(command_t c);
 int execute_switch(command_t c);
 
 
-int command_status (command_t c)
-{
-	return c->status;
-}
 
 void executingSubshell(command_t c)
 {
@@ -97,7 +95,10 @@ void executingSimple(command_t c)
     		if ( dup2(fp_out,1) < 0 )
     			error(1, errno, "Error with dup2 on %s.", c->output);
     	}
-    	execvp(c->u.word[0], c->u.word);
+		if (strcmp(c->u.word[0], "exec") != 0) 	
+    		execvp(c->u.word[0], c->u.word);
+    	else
+    		execvp(c->u.word[1],c->u.word+1);
     	error(1, errno, "Could not execute: %s.", c->u.word[0]);
     }
     else
@@ -246,9 +247,173 @@ void executingPipe(command_t c)
 }
 
 
+
+int command_status (command_t c)
+{
+	return c->status;
+}
+
+
+/* List Implementation (for parallel execution)*/
+
+typedef struct list* list_t;
+
+struct list
+{
+	void** data;
+	int count;
+	int alloc_len;
+};
+
+int list_size(list_t l)
+{
+	return l ? l->count : NULL; 
+}
+
+list_t list_init()
+{
+	list_t l;
+	l->count = 0;
+	l->alloc_len = 10;
+	l->data = (void**)checked_malloc(l->alloc_len * sizeof(void*));
+	return l;
+}
+
+void list_free(list_t l)
+{
+	free(l->data);
+}
+
+void list_push(list_t l, void* elem)
+{
+	if (l->count == l->alloc_len)
+		l->data = (void**)checked_grow_alloc(l->data, &l->alloc_len);
+	l->data[count++] = elem;
+}
+
+void* list_pop(list_t l)
+{
+	if (l->count == 0)
+		return NULL;
+	return l->data[--(l->count)];
+}
+
+void* list_peek(list_t l)
+{
+	if (l->count == 0)
+		return NULL;
+	return l->data[l->count - 1];
+}
+
+int isEmpty(list_t l)
+{
+	return l ? l->count : 0;
+}
+
+void appendList(list_t dest, list_t src)
+{
+	while(!isEmpty(src))
+		list_push(dest, list_pop(src));
+	list_free(src);
+}
+
+/* GRAPHNODE: Holds command, all other nodes which it depends on*/
+typedef struct graph_node graph_node_t;
+
+struct graph_node
+{
+	command_t cmd;
+	list_t before;    //list of graph nodes that current node depends on
+ 	list_t readlist;     //list of any input in the command. can be input or word[1..n]
+	list_t writelist;    //list of any output in the command. can only be output
+};
+ 
+//to do: list, construct_graph_node(), edit main, cd
+
+void construct_lists(graph_node_t g)
+{
+	command_t cmd = g->cmd;
+	if (cmd->type == SIMPLE_COMMAND)
+	{
+		if (cmd->output != NULL)
+			list_push(g->writelist,cmd->output);
+		if (cmd->input != NULL)
+			list_push(g->readlist, cmd->input);
+		
+		int i = 1;
+		while (words[i] != NULL)
+			list_push(g->readlist,cmd->u.word[i++]);
+	}
+	else if (cmd->type == SUBSHELL_COMMAND)
+	{
+		command_t sub_cmd = cmd->u.subshell_command;
+		graph_node_t sub_grph = construct_graph_node(sub_cmd);
+		//transfer sub_graph lists into normal ones.
+		appendList(g->writelist, sub_grph->writelist);
+		appendList(g->readlist, sub_grph->readlist);
+	}
+	else
+	{
+		//handle both sides
+		command_t left = cmd->u.command[0];
+		command_t right = cmd->u.command[1];
+		graph_node_t sub_left = construct_graph_node(left);
+		appendList(g->writelist, sub_left->writelist);
+		appendList(g->readlist, sub_left->readlist);
+		graph_node_t sub_right = construct_graph_node(right);
+		appendList(g->writelist, sub_right->writelist);
+		appendList(g->readlist, sub_right->readlist);
+	}
+
+}
+
+graph_node_t construct_graph_node(command_t cmd)
+{
+	graph_node_t g;
+	g->cmd = cmd;
+	g->readlist = g->writelist = g->before = list_init();
+	construct_lists(g);
+	return g;
+}
+
+void construct_dependencies(graph_node_t g, list_t graph_nodes)
+{
+	//fills out the before list in g.
+}
+
+void execute_parallel(command_stream_t cs)
+{
+
+	list_t no_dependencies = list_init();
+	list_t dependencies = list_init();
+	list_t graph_nodes = list_init();
+
+	command_t command;
+
+	while ((command = read_command_stream(cs)) != 0)
+	{
+		graph_node_t g = construct_graph_node(command);   //make readlist, writelist.
+		construct_dependencies(g, graph_nodes);  // check read/write for others in graph_nodes and create before** array
+		list_push(graph_nodes, g);
+		if (isEmpty(g->before))
+			list_push(no_dependencies, g);
+		else
+			list_push(dependencies, g);
+	}
+
+	//execute_no_dependencies();
+	//execute_dependencies();
+}
+
+
+
 void
 execute_command (command_t c, bool time_travel)
 {
   	if (!time_travel)
 	    execute_switch(c);
+	else
+		execute_parallel(c);
+
+
 }

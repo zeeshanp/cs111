@@ -67,7 +67,7 @@ void executingSubshell(command_t c)
 
 }
 
-void executingSequence(command_t c)
+void executingSequence(command_t c)		
 {
 	execute_switch(c->u.command[0]);
 	c->status = execute_switch(c->u.command[1]);
@@ -76,7 +76,7 @@ void executingSequence(command_t c)
 void executingSimple(command_t c)
 {
 	int status;
-    int child = fork();
+	int child = fork();
     if (child == 0)
     {
     	int fp_in, fp_out;
@@ -281,6 +281,7 @@ list_t list_init()
 
 void list_free(list_t l)
 {
+	//need to free each individual element? what about graph_node_free()
 	free(l->data);
 }
 
@@ -317,6 +318,7 @@ void appendList(list_t dest, list_t src)
 	list_free(src);
 }
 
+
 /* GRAPHNODE: Holds command, all other nodes which it depends on*/
 typedef struct graph_node graph_node_t;
 
@@ -326,26 +328,30 @@ struct graph_node
 	list_t before;    //list of graph nodes that current node depends on
  	list_t readlist;     //list of any input in the command. can be input or word[1..n]
 	list_t writelist;    //list of any output in the command. can only be output
+	pid_t pid;
 };
  
+
 //to do: list, construct_graph_node(), edit main, cd
 
 void construct_lists(graph_node_t g)
 {
 	command_t cmd = g->cmd;
+
+	if (cmd->output != NULL)
+		list_push(g->writelist,cmd->output);
+	if (cmd->input != NULL)
+		list_push(g->readlist, cmd->input);
+	
 	if (cmd->type == SIMPLE_COMMAND)
 	{
-		if (cmd->output != NULL)
-			list_push(g->writelist,cmd->output);
-		if (cmd->input != NULL)
-			list_push(g->readlist, cmd->input);
-		
 		int i = 1;
 		while (words[i] != NULL)
 			list_push(g->readlist,cmd->u.word[i++]);
 	}
 	else if (cmd->type == SUBSHELL_COMMAND)
 	{
+
 		command_t sub_cmd = cmd->u.subshell_command;
 		graph_node_t sub_grph = construct_graph_node(sub_cmd);
 		//transfer sub_graph lists into normal ones.
@@ -370,15 +376,35 @@ void construct_lists(graph_node_t g)
 graph_node_t construct_graph_node(command_t cmd)
 {
 	graph_node_t g;
+	g->pid = -1;
 	g->cmd = cmd;
-	g->readlist = g->writelist = g->before = list_init();
+	g->readlist = list_init();
+	g->writelist = list_init();
+	g->before = list_init();
 	construct_lists(g);
 	return g;
 }
 
 void construct_dependencies(graph_node_t g, list_t graph_nodes)
 {
-	//fills out the before list in g.
+		//fuck. this one is hard
+
+}
+
+void wait_for_dependency_threads(graph_node_t g)
+{
+	//waits for all threads in g->before to finish.
+	while (!isEmpty(g->before))
+	{
+		graph_node_t j = list_pop(g->before);
+		while (j->pid == -1)        //this might create deadlock?
+			continue;
+
+		int status;
+		waitpid(j->pid, &status, 0);
+	}
+
+
 }
 
 void execute_parallel(command_stream_t cs)
@@ -395,19 +421,56 @@ void execute_parallel(command_stream_t cs)
 		graph_node_t g = construct_graph_node(command);   //make readlist, writelist.
 		construct_dependencies(g, graph_nodes);  // check read/write for others in graph_nodes and create before** array
 		list_push(graph_nodes, g);
+	}
+
+
+	while(!isEmpty(graph_nodes))
+	{
+		graph_node_t g = list_pop(graph_nodes);
 		if (isEmpty(g->before))
 			list_push(no_dependencies, g);
 		else
 			list_push(dependencies, g);
 	}
 
-	//execute_no_dependencies();
+	//no dependencies
+	while (!isEmpty(no_dependencies))
+	{
+		graph_node_t g = list_pop(no_dependencies);
+		pid_t pid = fork();
+		if (pid < 0)
+			error(1,errno, "Error forking");
+		else if (pid == 0)
+		{
+			graph_node_t g = list_pop(no_dependencies);
+			execute_command(g->cmd);
+			graph_node_free(g);
+		}
+		else if (pid > 0)
+		{
+			g->pid = pid;
+		}
+	}	
+	
 	//execute_dependencies();
+	while (!isEmpty(dependencies))
+	{
+		graph_node_t g = list_pop(dependencies);
+		wait_for_dependency_threads(g);
+		pid_t pid = fork();
+		if (pid > 0)
+			error(1, errno, "Error forking");
+		else if (pid == 0)
+			execute_command(g->cmd);
+		else if (pid < 0)
+			g->pid = pid;
+	}
+
 }
 
 
 
-void
+void	
 execute_command (command_t c, bool time_travel)
 {
   	if (!time_travel)

@@ -7,12 +7,15 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "command.h"
 #include "command-internals.h"
+
 
 /* executing commands */
 
@@ -241,14 +244,12 @@ int command_status (command_t c)
 
 
 /* List Implementation (for parallel execution)*/
-
 typedef struct list* list_t;
-
 struct list
 {
 	void** data;
-	int count;
-	int alloc_len;
+	size_t count;
+	size_t alloc_len;
 };
 int list_size(list_t l)
 {
@@ -270,8 +271,8 @@ void list_free(list_t l)
 void list_push(list_t l, void* elem)
 {
 	if (l->count == l->alloc_len)
-		l->data = (void**)checked_grow_alloc(l->data, &l->alloc_len);
-	l->data[count++] = elem;
+		l->data = (void**)checked_grow_alloc(l->data, &(l->alloc_len));
+	l->data[(l->count)++] = elem;
 }
 void* list_pop(list_t l)
 {
@@ -298,8 +299,7 @@ void appendList(list_t dest, list_t src)
 
 
 /* GRAPHNODE: Holds command, all other nodes which it depends on*/
-typedef struct graph_node graph_node_t;
-
+typedef struct graph_node* graph_node_t;
 struct graph_node
 {
 	command_t cmd;
@@ -308,6 +308,13 @@ struct graph_node
 	list_t writelist;    //list of any output in the command. can only be output
 	pid_t pid;
 };
+
+void graph_node_free(graph_node_t g)
+{
+	list_free(g->before);
+	list_free(g->readlist);
+	list_free(g->writelist);
+}
  
 
 //to do: list, construct_graph_node(), edit main, cd
@@ -400,7 +407,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		//WAW
 		for (k = 0; k < graph_nodes->data[q]->writelist->count; k++)
 		{
-			for (kk = 0; kk < writelist->count; kk+)
+			for (kk = 0; kk < g->writelist->count; kk++)
 			{
 				if (strcmp(graph_nodes->data[q]->writelist->data[j], g->writelist->data[kk]) != 0)
 				{
@@ -412,7 +419,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 
 		add:
 		if (detect)
-			list_push(g->before, graph_nodes->data[q];
+			list_push(g->before, graph_nodes->data[q]);
 	}
 
 }
@@ -469,7 +476,7 @@ void execute_parallel(command_stream_t cs)
 		else if (pid == 0)
 		{
 			graph_node_t g = list_pop(no_dependencies);
-			execute_command(g->cmd);
+			execute_command(g->cmd, false);
 			graph_node_free(g);
 		}
 		else if (pid > 0)
@@ -487,7 +494,7 @@ void execute_parallel(command_stream_t cs)
 		if (pid > 0)
 			error(1, errno, "Error forking");
 		else if (pid == 0)
-			execute_command(g->cmd);
+			execute_command(g->cmd, false);
 		else if (pid < 0)
 			g->pid = pid;
 	}
@@ -501,8 +508,8 @@ execute_command (command_t c, bool time_travel)
 {
   	if (!time_travel)
 	    execute_switch(c);
-	else
-		execute_parallel(c);
+	//else
+	//	execute_parallel(c);
 
 
 }

@@ -24,8 +24,6 @@ void executingSequence(command_t c);
 void executingPipe(command_t c);
 int execute_switch(command_t c);
 
-
-
 void executingSubshell(command_t c)
 {
 	int status;
@@ -66,13 +64,11 @@ void executingSubshell(command_t c)
 
 
 }
-
 void executingSequence(command_t c)		
 {
 	execute_switch(c->u.command[0]);
 	c->status = execute_switch(c->u.command[1]);
 }
-
 void executingSimple(command_t c)
 {
 	int status;
@@ -108,8 +104,6 @@ void executingSimple(command_t c)
     }
     c->status = WEXITSTATUS(status);
 }
-
-
 void executingOr(command_t c)
 {
 	//execute the left command.
@@ -123,8 +117,6 @@ void executingOr(command_t c)
 	else
 		c->status = status;
 }
-
-
 void executingAnd(command_t c)
 {
 	int status = execute_switch(c->u.command[0]);
@@ -134,8 +126,6 @@ void executingAnd(command_t c)
 	else
 		c->status = status;	
 }
-
-
 int execute_switch(command_t c)
 {
 	switch(c->type)
@@ -163,7 +153,6 @@ int execute_switch(command_t c)
 	}
 	return c->status;
 }
-
 void executingPipe(command_t c)
 {
 	pid_t returnedPid;
@@ -245,9 +234,6 @@ void executingPipe(command_t c)
 		}
 	}	
 }
-
-
-
 int command_status (command_t c)
 {
 	return c->status;
@@ -264,53 +250,45 @@ struct list
 	int count;
 	int alloc_len;
 };
-
 int list_size(list_t l)
 {
 	return l ? l->count : NULL; 
 }
-
 list_t list_init()
 {
 	list_t l;
 	l->count = 0;
-	l->alloc_len = 10;
+	l->alloc_len = 16;
 	l->data = (void**)checked_malloc(l->alloc_len * sizeof(void*));
 	return l;
 }
-
 void list_free(list_t l)
 {
 	//need to free each individual element? what about graph_node_free()
 	free(l->data);
 }
-
 void list_push(list_t l, void* elem)
 {
 	if (l->count == l->alloc_len)
 		l->data = (void**)checked_grow_alloc(l->data, &l->alloc_len);
 	l->data[count++] = elem;
 }
-
 void* list_pop(list_t l)
 {
 	if (l->count == 0)
 		return NULL;
 	return l->data[--(l->count)];
 }
-
 void* list_peek(list_t l)
 {
 	if (l->count == 0)
 		return NULL;
 	return l->data[l->count - 1];
 }
-
 int isEmpty(list_t l)
 {
 	return l ? l->count : 0;
 }
-
 void appendList(list_t dest, list_t src)
 {
 	while(!isEmpty(src))
@@ -387,7 +365,55 @@ graph_node_t construct_graph_node(command_t cmd)
 
 void construct_dependencies(graph_node_t g, list_t graph_nodes)
 {
-		//fuck. this one is hard
+	int q,i,ii,j,jj,k,kk;
+	bool detect = false;
+
+	for (q = 0; q < graph_nodes->count; q++) //iterate thru each node
+	{
+		//RAW
+		for (i = 0; i < graph_nodes->data[q]->writelist->count; i++) //iterate thru writelist
+		{
+			for (ii = 0; ii < g->readlist->count; ii++)
+			{
+				if (strcmp(graph_nodes->data[q]->readlist->data[i], g->readlist->data[ii]) != 0)
+				{
+					detect = true;
+					goto add;
+				}
+			}
+
+		}
+
+		//WAR
+		for (j = 0; j < graph_nodes->data[q]->readlist->count; j++)
+		{
+			for (jj = 0; jj < g->writelist->count; jj++)
+			{
+				if (strcmp(graph_nodes->data[q]->readlist[j], g->writelist->data[jj]) != 0)
+				{
+					detect = true;
+					goto add;
+				}
+			}
+		}
+
+		//WAW
+		for (k = 0; k < graph_nodes->data[q]->writelist->count; k++)
+		{
+			for (kk = 0; kk < writelist->count; kk+)
+			{
+				if (strcmp(graph_nodes->data[q]->writelist->data[j], g->writelist->data[kk]) != 0)
+				{
+					detect = true;
+					goto add;
+				}
+			}
+		}
+
+		add:
+		if (detect)
+			list_push(g->before, graph_nodes->data[q];
+	}
 
 }
 

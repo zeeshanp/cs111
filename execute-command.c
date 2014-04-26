@@ -1,5 +1,4 @@
 // UCLA CS 111 Lab 1 command execution
-
 #include <error.h>
 #include <unistd.h>
 #include <error.h>
@@ -16,9 +15,7 @@
 #include "command.h"
 #include "command-internals.h"
 
-
 /* executing commands */
-
 void executingSimple(command_t c);
 void executingSubshell(command_t c);
 void executingAnd(command_t c);
@@ -244,20 +241,15 @@ int command_status (command_t c)
 
 
 /* List Implementation (for parallel execution)*/
-typedef struct list* list_t;
-struct list
+typedef struct list
 {
 	void** data;
 	size_t count;
 	size_t alloc_len;
-};
-int list_size(list_t l)
-{
-	return l ? l->count : NULL; 
-}
+} *list_t;
 list_t list_init()
 {
-	list_t l;
+	list_t l = (list_t) checked_malloc(sizeof(struct list));
 	l->count = 0;
 	l->alloc_len = 16;
 	l->data = (void**)checked_malloc(l->alloc_len * sizeof(void*));
@@ -299,15 +291,28 @@ void appendList(list_t dest, list_t src)
 
 
 /* GRAPHNODE: Holds command, all other nodes which it depends on*/
-typedef struct graph_node* graph_node_t;
-struct graph_node
+typedef struct graph_node
 {
 	command_t cmd;
 	list_t before;    //list of graph nodes that current node depends on
  	list_t readlist;     //list of any input in the command. can be input or word[1..n]
 	list_t writelist;    //list of any output in the command. can only be output
 	pid_t pid;
-};
+} *graph_node_t;
+
+void construct_lists(graph_node_t g);
+
+graph_node_t construct_graph_node(command_t cmd)
+{
+	graph_node_t g = (graph_node_t) checked_malloc(sizeof(struct graph_node));
+	g->pid = -1;
+	g->cmd = cmd;
+	g->readlist = list_init();
+	g->writelist = list_init();
+	g->before = list_init();
+	construct_lists(g);
+	return g;
+}
 
 void graph_node_free(graph_node_t g)
 {
@@ -316,7 +321,6 @@ void graph_node_free(graph_node_t g)
 	list_free(g->writelist);
 }
  
-
 //to do: list, construct_graph_node(), edit main, cd
 
 void construct_lists(graph_node_t g)
@@ -331,7 +335,7 @@ void construct_lists(graph_node_t g)
 	if (cmd->type == SIMPLE_COMMAND)
 	{
 		int i = 1;
-		while (words[i] != NULL)
+		while ((*cmd).u.word[i] != NULL)
 			list_push(g->readlist,cmd->u.word[i++]);
 	}
 	else if (cmd->type == SUBSHELL_COMMAND)
@@ -358,31 +362,20 @@ void construct_lists(graph_node_t g)
 
 }
 
-graph_node_t construct_graph_node(command_t cmd)
-{
-	graph_node_t g;
-	g->pid = -1;
-	g->cmd = cmd;
-	g->readlist = list_init();
-	g->writelist = list_init();
-	g->before = list_init();
-	construct_lists(g);
-	return g;
-}
-
 void construct_dependencies(graph_node_t g, list_t graph_nodes)
 {
-	int q,i,ii,j,jj,k,kk;
+	size_t q,i,ii,j,jj,k,kk;
 	bool detect = false;
 
 	for (q = 0; q < graph_nodes->count; q++) //iterate thru each node
 	{
 		//RAW
-		for (i = 0; i < graph_nodes->data[q]->writelist->count; i++) //iterate thru writelist
+		graph_node_t cur = graph_nodes->data[q];
+		for (i = 0; i < cur->writelist->count; i++) //iterate thru writelist
 		{
 			for (ii = 0; ii < g->readlist->count; ii++)
 			{
-				if (strcmp(graph_nodes->data[q]->readlist->data[i], g->readlist->data[ii]) != 0)
+				if (strcmp(cur->readlist->data[i], g->readlist->data[ii]) != 0)
 				{
 					detect = true;
 					goto add;
@@ -392,11 +385,11 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		}
 
 		//WAR
-		for (j = 0; j < graph_nodes->data[q]->readlist->count; j++)
+		for (j = 0; j < cur->readlist->count; j++)
 		{
 			for (jj = 0; jj < g->writelist->count; jj++)
 			{
-				if (strcmp(graph_nodes->data[q]->readlist[j], g->writelist->data[jj]) != 0)
+				if (strcmp(cur->readlist->data[j], g->writelist->data[jj]) != 0)
 				{
 					detect = true;
 					goto add;
@@ -405,11 +398,11 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		}
 
 		//WAW
-		for (k = 0; k < graph_nodes->data[q]->writelist->count; k++)
+		for (k = 0; k < cur->writelist->count; k++)
 		{
 			for (kk = 0; kk < g->writelist->count; kk++)
 			{
-				if (strcmp(graph_nodes->data[q]->writelist->data[j], g->writelist->data[kk]) != 0)
+				if (strcmp(cur->writelist->data[j], g->writelist->data[kk]) != 0)
 				{
 					detect = true;
 					goto add;

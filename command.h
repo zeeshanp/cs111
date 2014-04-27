@@ -24,3 +24,6 @@ void execute_command (command_t, bool);
 /* Return the exit status of a command, which must have previously
    been executed.  Wait for the command, if it is not already finished.  */
 int command_status (command_t);
+
+
+void execute_parallel(command_stream_t cs);

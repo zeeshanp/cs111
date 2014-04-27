@@ -280,8 +280,16 @@ void* list_peek(list_t l)
 }
 int isEmpty(list_t l)
 {
-	return l ? l->count : 0;
+	if (l->count == 0)
+		return 1;
+	else
+		return 0;
 }
+void* list_elem(list_t src, int i)
+{
+	return src->data[i];
+}
+
 void appendList(list_t dest, list_t src)
 {
 	while(!isEmpty(src))
@@ -321,22 +329,21 @@ void graph_node_free(graph_node_t g)
 	list_free(g->writelist);
 }
  
-//to do: list, construct_graph_node(), edit main, cd
-
 void construct_lists(graph_node_t g)
 {
 	command_t cmd = g->cmd;
 
-	if (cmd->output != NULL)
-		list_push(g->writelist,cmd->output);
-	if (cmd->input != NULL)
-		list_push(g->readlist, cmd->input);
 	
 	if (cmd->type == SIMPLE_COMMAND)
 	{
 		int i = 1;
-		while ((*cmd).u.word[i] != NULL)
-			list_push(g->readlist,cmd->u.word[i++]);
+		while ( (cmd->u.word)[i] != NULL)
+			list_push(g->readlist,(cmd->u.word)[i++]);
+
+		if (cmd->output != NULL)
+			list_push(g->writelist, cmd->output);
+		if (cmd->input != NULL)
+			list_push(g->readlist, cmd->input);
 	}
 	else if (cmd->type == SUBSHELL_COMMAND)
 	{
@@ -346,6 +353,11 @@ void construct_lists(graph_node_t g)
 		//transfer sub_graph lists into normal ones.
 		appendList(g->writelist, sub_grph->writelist);
 		appendList(g->readlist, sub_grph->readlist);
+
+		if (cmd->output != NULL)
+			list_push(g->writelist, cmd->output);
+		if (cmd->input != NULL)
+			list_push(g->readlist, cmd->input);
 	}
 	else
 	{
@@ -358,7 +370,7 @@ void construct_lists(graph_node_t g)
 		graph_node_t sub_right = construct_graph_node(right);
 		appendList(g->writelist, sub_right->writelist);
 		appendList(g->readlist, sub_right->readlist);
-	}
+	} 
 
 }
 
@@ -448,8 +460,7 @@ void execute_parallel(command_stream_t cs)
 		construct_dependencies(g, graph_nodes);  // check read/write for others in graph_nodes and create before** array
 		list_push(graph_nodes, g);
 	}
-
-
+		
 	while(!isEmpty(graph_nodes))
 	{
 		graph_node_t g = list_pop(graph_nodes);
@@ -459,24 +470,25 @@ void execute_parallel(command_stream_t cs)
 			list_push(dependencies, g);
 	}
 
+		
 	//no dependencies
-	while (!isEmpty(no_dependencies))
+	
+	size_t i;
+	for (i = 0; i < no_dependencies->count; i++)
 	{
-		graph_node_t g = list_pop(no_dependencies);
+		graph_node_t g = list_elem(no_dependencies, i);
 		pid_t pid = fork();
 		if (pid < 0)
-			error(1,errno, "Error forking");
+			error(1,errno, "Error Forking");
 		else if (pid == 0)
 		{
-			graph_node_t g = list_pop(no_dependencies);
-			execute_command(g->cmd, false);
-			graph_node_free(g);
+			int status = execute_switch(g->cmd);
+			_exit(status);
 		}
 		else if (pid > 0)
-		{
 			g->pid = pid;
-		}
-	}	
+	}
+			
 	
 	//execute_dependencies();
 	while (!isEmpty(dependencies))
@@ -490,8 +502,8 @@ void execute_parallel(command_stream_t cs)
 			execute_command(g->cmd, false);
 		else if (pid < 0)
 			g->pid = pid;
-	}
-
+	} 
+		
 }
 
 

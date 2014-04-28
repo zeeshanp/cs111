@@ -292,9 +292,11 @@ void* list_elem(list_t src, int i)
 
 void appendList(list_t dest, list_t src)
 {
-	while(!isEmpty(src))
-		list_push(dest, list_pop(src));
-	list_free(src);
+	size_t i;
+	for (i = 0; i < src->count; i++)
+	{
+		list_push(dest, src->data[i]);
+	}
 }
 
 
@@ -429,21 +431,6 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 
 }
 
-void wait_for_dependency_threads(graph_node_t g)
-{
-	//waits for all threads in g->before to finish.
-	while (!isEmpty(g->before))
-	{
-		graph_node_t j = list_pop(g->before);
-		while (j->pid == -1)        //this might create deadlock?
-			continue;
-
-		int status;
-		waitpid(j->pid, &status, 0);
-	}
-
-
-}
 
 void execute_parallel(command_stream_t cs)
 {
@@ -460,6 +447,10 @@ void execute_parallel(command_stream_t cs)
 		construct_dependencies(g, graph_nodes);  // check read/write for others in graph_nodes and create before** array
 		list_push(graph_nodes, g);
 	}
+
+	
+	//debugging statements
+
 		
 	while(!isEmpty(graph_nodes))
 	{
@@ -470,8 +461,7 @@ void execute_parallel(command_stream_t cs)
 			list_push(dependencies, g);
 	}
 
-		
-	//no dependencies
+	printf("dep: %d\n no dep: %d\n", dependencies->count,no_dependencies->count);
 	
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
@@ -488,22 +478,36 @@ void execute_parallel(command_stream_t cs)
 		else if (pid > 0)
 			g->pid = pid;
 	}
-			
-	
-	//execute_dependencies();
-	while (!isEmpty(dependencies))
+	/*
+	//execute dependencies
+	size_t j;
+	for (j = 0; j < dependencies->count; j++)
 	{
-		graph_node_t g = list_pop(dependencies);
-		wait_for_dependency_threads(g);
+		graph_node_t g = list_elem(dependencies, j);
+		label:;
+			size_t k;
+			for(k = 0; k < g->before->count; k++)
+			{
+				graph_node_t gg = list_elem(g->before, k);
+				if (gg->pid == -1)
+					goto label;
+			}
+		int status;
+		size_t x;
+		for (x = 0; x < g->before->count; x++)
+		{
+			graph_node_t gg = list_elem(g->before, x);
+			waitpid(gg->pid, status, 0);
+		}		
 		pid_t pid = fork();
-		if (pid > 0)
-			error(1, errno, "Error forking");
-		else if (pid == 0)
+		if (pid == 0)
 			execute_command(g->cmd, false);
-		else if (pid < 0)
+		else if (pid > 0)
 			g->pid = pid;
-	} 
-		
+		else if (pid < 0)
+			error(1,errno, "Error forking");
+	}*/
+				
 }
 
 

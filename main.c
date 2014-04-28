@@ -33,7 +33,8 @@ main (int argc, char **argv)
   for (;;)
     switch (getopt (argc, argv, "pt"))
       {
-      case 'p': print_tree = true; break;
+    
+  case 'p': print_tree = true; break;
       case 't': time_travel = true; break;
       default: usage (); break;
       case -1: goto options_exhausted;
@@ -59,7 +60,7 @@ main (int argc, char **argv)
 	}
 	else
 	{
- 		 while ((command = read_command_stream (command_stream)))
+		 while ((command = read_command_stream (command_stream)))
    		 {
      		 if (print_tree)
 			 {
@@ -75,5 +76,5 @@ main (int argc, char **argv)
 	}
 
   //return print_tree || !last_command ? 0 : command_status (last_command);
-    return 0;
+  return 0;
 }

@@ -383,13 +383,15 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 
 	for (q = 0; q < graph_nodes->count; q++) //iterate thru each node
 	{
-		//RAW
+		
 		graph_node_t cur = graph_nodes->data[q];
+		
+		//RAW
 		for (i = 0; i < cur->writelist->count; i++) //iterate thru writelist
 		{
 			for (ii = 0; ii < g->readlist->count; ii++)
 			{
-				if (strcmp(cur->readlist->data[i], g->readlist->data[ii]) == 0)
+				if (strcmp(cur->writelist->data[i], g->readlist->data[ii]) == 0)
 				{
 					detect = true;
 					goto add;
@@ -416,7 +418,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		{
 			for (kk = 0; kk < g->writelist->count; kk++)
 			{
-				if (strcmp(cur->writelist->data[j], g->writelist->data[kk]) == 0)
+				if (strcmp(cur->writelist->data[k], g->writelist->data[kk]) == 0)
 				{
 					detect = true;
 					goto add;
@@ -448,28 +450,49 @@ void execute_parallel(command_stream_t cs)
 		list_push(graph_nodes, g);
 	}
 
-	
-	//print out graph:
-	size_t i;
+
+	//print out graph and all read/write lists:
+/*	size_t i;
 	for(i = 0; i < graph_nodes->count; i++)
 	{
 		graph_node_t g = list_elem(graph_nodes, i);
 		printf("Command %d: %s\n", i+1, g->cmd->u.word[0]);
-	}
+		//print out readlist:
+		printf("ReadList: ");
+		size_t j;
+		for (j = 0; j < g->readlist->count; j++)
+		{
+			printf(" %s,", g->readlist->data[j]);
+		}
+		size_t k;
+		printf("\nWriteList:");
+		for (k = 0; k < g->writelist->count; k++)
+		{
+			printf(" %s,", g->writelist->data[k]);
+		}
+		printf("\nBeforeArray:");
+		size_t l;
+		for (l = 0; l < g->before->count; l++)
+		{
+			graph_node_t gg = g->before->data[l];
+			printf(" %s,", gg->cmd->u.word[0]);
+		}	
+		printf("\n");
+	} */ 
 
-		
-	while(!isEmpty(graph_nodes))
+	size_t idx;
+	for (idx = 0; idx < graph_nodes->count; idx++)
 	{
-		graph_node_t g = list_pop(graph_nodes);
+		graph_node_t g = list_elem(graph_nodes, idx);
 		if (isEmpty(g->before))
 			list_push(no_dependencies, g);
 		else
 			list_push(dependencies, g);
 	}
-	
-	printf("\n\nDep Cmd's: %d\nNon-Dep Cmd's: %d\n\n", dependencies->count, no_dependencies->count);
+		
+	//printf("\n\nDep Cmd's: %d\nNon-Dep Cmd's: %d\n\n", dependencies->count, no_dependencies->count);
 
-	
+/*	
 	
 	//print out dep/no dep graphs
 	size_t j;
@@ -484,10 +507,9 @@ void execute_parallel(command_stream_t cs)
 		graph_node_t g = list_elem(no_dependencies,k);
 		printf("No Dep Cmd %d: %s\n", k+1, g->cmd->u.word[0]);
 	}
-
-
+		*/	
 	
-	/*
+	//execute non_dependencies	
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
 	{
@@ -535,7 +557,7 @@ void execute_parallel(command_stream_t cs)
 			error(1,errno, "Error forking");
 	
 	}
-	*/					
+						
 }
 
 

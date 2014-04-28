@@ -389,7 +389,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		{
 			for (ii = 0; ii < g->readlist->count; ii++)
 			{
-				if (strcmp(cur->readlist->data[i], g->readlist->data[ii]) != 0)
+				if (strcmp(cur->readlist->data[i], g->readlist->data[ii]) == 0)
 				{
 					detect = true;
 					goto add;
@@ -403,7 +403,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		{
 			for (jj = 0; jj < g->writelist->count; jj++)
 			{
-				if (strcmp(cur->readlist->data[j], g->writelist->data[jj]) != 0)
+				if (strcmp(cur->readlist->data[j], g->writelist->data[jj]) == 0)
 				{
 					detect = true;
 					goto add;
@@ -416,7 +416,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 		{
 			for (kk = 0; kk < g->writelist->count; kk++)
 			{
-				if (strcmp(cur->writelist->data[j], g->writelist->data[kk]) != 0)
+				if (strcmp(cur->writelist->data[j], g->writelist->data[kk]) == 0)
 				{
 					detect = true;
 					goto add;
@@ -449,7 +449,13 @@ void execute_parallel(command_stream_t cs)
 	}
 
 	
-	//debugging statements
+	//print out graph:
+	size_t i;
+	for(i = 0; i < graph_nodes->count; i++)
+	{
+		graph_node_t g = list_elem(graph_nodes, i);
+		printf("Command %d: %s\n", i+1, g->cmd->u.word[0]);
+	}
 
 		
 	while(!isEmpty(graph_nodes))
@@ -460,9 +466,28 @@ void execute_parallel(command_stream_t cs)
 		else
 			list_push(dependencies, g);
 	}
-
-	printf("dep: %d\n no dep: %d\n", dependencies->count,no_dependencies->count);
 	
+	printf("\n\nDep Cmd's: %d\nNon-Dep Cmd's: %d\n\n", dependencies->count, no_dependencies->count);
+
+	
+	
+	//print out dep/no dep graphs
+	size_t j;
+	for (j = 0; j < dependencies->count; j++)
+	{
+		graph_node_t g = list_elem(dependencies,j);
+		printf("Dep Cmd %d: %s\n", j+1, g->cmd->u.word[0]);
+	}
+	size_t k;
+	for (k = 0; k < no_dependencies->count; k++)
+	{
+		graph_node_t g = list_elem(no_dependencies,k);
+		printf("No Dep Cmd %d: %s\n", k+1, g->cmd->u.word[0]);
+	}
+
+
+	
+	/*
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
 	{
@@ -478,7 +503,9 @@ void execute_parallel(command_stream_t cs)
 		else if (pid > 0)
 			g->pid = pid;
 	}
-	/*
+
+
+	
 	//execute dependencies
 	size_t j;
 	for (j = 0; j < dependencies->count; j++)
@@ -497,7 +524,7 @@ void execute_parallel(command_stream_t cs)
 		for (x = 0; x < g->before->count; x++)
 		{
 			graph_node_t gg = list_elem(g->before, x);
-			waitpid(gg->pid, status, 0);
+			waitpid(gg->pid, &status, WNOHANG);
 		}		
 		pid_t pid = fork();
 		if (pid == 0)
@@ -506,8 +533,9 @@ void execute_parallel(command_stream_t cs)
 			g->pid = pid;
 		else if (pid < 0)
 			error(1,errno, "Error forking");
-	}*/
-				
+	
+	}
+	*/					
 }
 
 

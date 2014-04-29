@@ -526,38 +526,46 @@ void execute_parallel(command_stream_t cs)
 			g->pid = pid;
 	}
 
-
-	
 	//execute dependencies
-	size_t j;
-	for (j = 0; j < dependencies->count; j++)
+
+	for(i = 0; i < dependencies->count;i++)
 	{
-		graph_node_t g = list_elem(dependencies, j);
-		label:;
-			size_t k;
-			for(k = 0; k < g->before->count; k++)
-			{
-				graph_node_t gg = list_elem(g->before, k);
-				if (gg->pid == -1)
-					goto label;
-			}
+		graph_node_t g = (graph_node_t)list_elem(dependencies, i);
+		//wait for each dependent cmd to run
+		size_t j;
 		int status;
-		size_t x;
-		for (x = 0; x < g->before->count; x++)
+		for (j = 0; j < g->before->count; j++)
 		{
-			graph_node_t gg = list_elem(g->before, x);
-			waitpid(gg->pid, &status, WNOHANG);
-		}		
+			graph_node_t gg = (graph_node_t)list_elem(g->before, j);
+			while (gg->pid == -1)
+				continue;
+			waitpid(gg->pid, &status, 0);
+		}
 		pid_t pid = fork();
 		if (pid == 0)
-			execute_command(g->cmd, false);
+		{
+			int status = execute_switch(g->cmd);
+			_exit(status);			
+			printf("Do we get here?\n");
+		}
 		else if (pid > 0)
 			g->pid = pid;
-		else if (pid < 0)
-			error(1,errno, "Error forking");
-	
 	}
-						
+
+	//reap all remaining children
+	size_t x,y;
+	int stat;
+	for (x = 0; x < dependencies->count; x++)
+	{
+		graph_node_t g = list_elem(dependencies, x);
+		waitpid(g->pid, &stat, 0);
+	}
+	for (y = 0; y < no_dependencies->count; y++)
+	{
+		graph_node_t g = list_elem(no_dependencies, y);
+		waitpid(g->pid, &stat, 0);
+	}
+				
 }
 
 

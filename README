@@ -1,14 +1,47 @@
-This is a skeleton for CS 111 Lab 1.
+UCLA CS111 LAB 1
 
-Lab 1b
+
+Zeeshan Pirzada: 404144615
 
 Kevin Sheu: 204160159
 
-Zeeshan Pirzada: 404144615
+
+Usage:
+
+	./timetrash [-pt] [FILE]
+
+	-p    Prints out command tree's.
+	-t    Executes commands in parallel.
+
+Implementation Details:
+	1a:
+	 In order to implement lab1a, we first tokenized the
+	 entire input file, getting rid of any spaces or 
+	 comments. After, we used two stacks to form a postorder 
+	 of any commands and their arguments. Using this post order,
+	 we were able to construct each command tree.
+	1b: 
+	 For lab 1b, we iterated through the command tree recursively.
+	 Once we reached a simple command, we opened the correct
+	 file descriptors and then executed the command. For pipes,
+	 we chose to have the main process be the parent process, with
+	 the rhs as a child and the lhs as grandchild.
+	1c:
+	 For lab 1c, we execute the commands in parallel by first 
+	 determining which commands have the following data hazards:
+	 Read after Write, Write after Write, and Write after Read.
+	 Once we determined these commands, we launched processes to 
+	 first execute all independent commands, and once race conditions
+	 had been resolved, execute the dependent commands.
+		
+
 
 
 KNOWN ERRORS:
 -Our shell does not handle subshell redirects properly, 
  the script (a && b) > c.txt will give a syntax error.
+-The command `sleep` does not work if it is the first 
+ command in a file. It works anywhere else.
+
 
 

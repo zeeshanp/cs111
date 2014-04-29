@@ -445,40 +445,11 @@ void execute_parallel(command_stream_t cs)
 
 	while ((command = read_command_stream(cs)) != 0)
 	{
-		graph_node_t g = construct_graph_node(command);   //make readlist, writelist.
-		construct_dependencies(g, graph_nodes);  // check read/write for others in graph_nodes and create before** array
+		graph_node_t g = construct_graph_node(command);   
+		construct_dependencies(g, graph_nodes);  
 		list_push(graph_nodes, g);
 	}
 
-
-	//print out graph and all read/write lists:
-/*	size_t i;
-	for(i = 0; i < graph_nodes->count; i++)
-	{
-		graph_node_t g = list_elem(graph_nodes, i);
-		printf("Command %d: %s\n", i+1, g->cmd->u.word[0]);
-		//print out readlist:
-		printf("ReadList: ");
-		size_t j;
-		for (j = 0; j < g->readlist->count; j++)
-		{
-			printf(" %s,", g->readlist->data[j]);
-		}
-		size_t k;
-		printf("\nWriteList:");
-		for (k = 0; k < g->writelist->count; k++)
-		{
-			printf(" %s,", g->writelist->data[k]);
-		}
-		printf("\nBeforeArray:");
-		size_t l;
-		for (l = 0; l < g->before->count; l++)
-		{
-			graph_node_t gg = g->before->data[l];
-			printf(" %s,", gg->cmd->u.word[0]);
-		}	
-		printf("\n");
-	} */ 
 
 	size_t idx;
 	for (idx = 0; idx < graph_nodes->count; idx++)
@@ -490,24 +461,7 @@ void execute_parallel(command_stream_t cs)
 			list_push(dependencies, g);
 	}
 		
-	//printf("\n\nDep Cmd's: %d\nNon-Dep Cmd's: %d\n\n", dependencies->count, no_dependencies->count);
-
-/*	
 	
-	//print out dep/no dep graphs
-	size_t j;
-	for (j = 0; j < dependencies->count; j++)
-	{
-		graph_node_t g = list_elem(dependencies,j);
-		printf("Dep Cmd %d: %s\n", j+1, g->cmd->u.word[0]);
-	}
-	size_t k;
-	for (k = 0; k < no_dependencies->count; k++)
-	{
-		graph_node_t g = list_elem(no_dependencies,k);
-		printf("No Dep Cmd %d: %s\n", k+1, g->cmd->u.word[0]);
-	}
-		*/	
 	
 	//execute non_dependencies	
 	size_t i;

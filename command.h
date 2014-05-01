@@ -26,4 +26,4 @@ void execute_command (command_t, bool);
 int command_status (command_t);
 
 
-void execute_parallel(command_stream_t cs);
+void execute_parallel(command_stream_t cs, int N);

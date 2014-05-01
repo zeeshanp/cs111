@@ -434,8 +434,10 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 }
 
 
-void execute_parallel(command_stream_t cs)
+void execute_parallel(command_stream_t cs, int N)
 {
+	if (N == 5)
+		N = 5;
 
 	list_t no_dependencies = list_init();
 	list_t dependencies = list_init();

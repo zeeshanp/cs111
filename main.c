@@ -4,6 +4,7 @@
 #include <error.h>
 #include <getopt.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "command.h"
 
@@ -29,14 +30,19 @@ main (int argc, char **argv)
   bool print_tree = false;
   bool time_travel = false;
   program_name = argv[0];
+  int N;
+
 
   for (;;)
-    switch (getopt (argc, argv, "pt"))
+    switch (getopt (argc, argv, "ptN:"))
       {
-    
-  case 'p': print_tree = true; break;
+      case 'p': print_tree = true; break;
       case 't': time_travel = true; break;
+	  case 'N': N = atoi(optarg); break;
       default: usage (); break;
+	  case '?':
+			if (optopt == 'N')
+				error(1,errno, "Option -N requires an argument.\n");
       case -1: goto options_exhausted;
       }
  options_exhausted:;
@@ -56,7 +62,7 @@ main (int argc, char **argv)
   command_t command;
 	if (time_travel)
 	{
-		execute_parallel(command_stream);
+		execute_parallel(command_stream, N);
 	}
 	else
 	{

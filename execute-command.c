@@ -439,32 +439,37 @@ union semun
 {
 	int val;
 	struct semid_ds *buf;
-	unsigned short* array;
-	struct seminfo* __buf;
-} argument;
+	ushort_t *array;	
+} arg;
+
+int sem_wait(int* id)
+{
+	struct sembuf* sb;
+	sb.sem_num = 0;
+	sb.sem_op = 0;
+	sb.sem_flg = 0;
+	if ( semop(*id, sb, 1) < 0) 
+}
+
 
 void execute_parallel(command_stream_t cs, int N)
 {
 	int MAX_PROCS = N;
 	int NUM_PROCS = 0;	
-
+	int ret;
 	/*declare semaphore */
-	key_t key = IPC_PRIVATE;
-	argument.val = 0;
-	int id;
+	key_t key = IPC_PRIVATE; 
+	arg.val = 0; //tells semctl() we are using 1st semaphore
+	int id;  //return value for semget()
 	if ( (id = semget(key, 1, 0666|IPC_CREAT|IPC_EXCL)) < 0 )
 	{
 		error(1, errno, "Error creating semaphore.\n");
 	}
-	if ( semctl(id, 0, SETVAL, argument) < 0)
+	if ( semctl(id, 0, SETVAL, arg) < 0)
 	{
 		error(1, errno, "Error initializing semaphore.\n");
 	}
 	
-
-	
-
-
 	list_t no_dependencies = list_init();
 	list_t dependencies = list_init();
 	list_t graph_nodes = list_init();
@@ -502,8 +507,6 @@ void execute_parallel(command_stream_t cs, int N)
 				continue;
 		}
 
-		//if (N != -1)
-		//
 		pid_t pid = fork();
 		if (pid < 0)
 			error(1,errno, "Error Forking");
@@ -543,20 +546,26 @@ void execute_parallel(command_stream_t cs, int N)
 	}
 	
 
-	//reap all remaining children
+	//reap all remaining children. 
 	size_t x,y;
 	int stat;
 	for (x = 0; x < dependencies->count; x++)
 	{
 		graph_node_t g = list_elem(dependencies, x);
 		waitpid(g->pid, &stat, 0);
+		graph_node_free(g);
 	}
+	list_free(dependencies);
 	for (y = 0; y < no_dependencies->count; y++)
 	{
 		graph_node_t g = list_elem(no_dependencies, y);
 		waitpid(g->pid, &stat, 0);
+		graph_node_free(g);
 	}
-				
+	list_free(no_dependencies);
+
+	//destroy semaphore
+	ret = semctl(*id, 0, IPC_RMID);				
 }
 
 

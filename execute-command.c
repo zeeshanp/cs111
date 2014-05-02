@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -433,11 +435,35 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 
 }
 
+union semun
+{
+	int val;
+	struct semid_ds *buf;
+	unsigned short* array;
+	struct seminfo* __buf;
+} argument;
 
 void execute_parallel(command_stream_t cs, int N)
 {
-	if (N == 5)
-		N = 5;
+	int MAX_PROCS = N;
+	int NUM_PROCS = 0;	
+
+	/*declare semaphore */
+	key_t key = IPC_PRIVATE;
+	argument.val = 0;
+	int id;
+	if ( (id = semget(key, 1, 0666|IPC_CREAT|IPC_EXCL)) < 0 )
+	{
+		error(1, errno, "Error creating semaphore.\n");
+	}
+	if ( semctl(id, 0, SETVAL, argument) < 0)
+	{
+		error(1, errno, "Error initializing semaphore.\n");
+	}
+	
+
+	
+
 
 	list_t no_dependencies = list_init();
 	list_t dependencies = list_init();
@@ -463,13 +489,21 @@ void execute_parallel(command_stream_t cs, int N)
 			list_push(dependencies, g);
 	}
 		
-	
-	
+
+
 	//execute non_dependencies	
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
 	{
 		graph_node_t g = list_elem(no_dependencies, i);
+		if (limit_proc)
+		{
+			while(CURR_PROCS == MAX_PROCS)
+				continue;
+		}
+
+		//if (N != -1)
+		//
 		pid_t pid = fork();
 		if (pid < 0)
 			error(1,errno, "Error Forking");
@@ -507,6 +541,7 @@ void execute_parallel(command_stream_t cs, int N)
 		else if (pid > 0)
 			g->pid = pid;
 	}
+	
 
 	//reap all remaining children
 	size_t x,y;

@@ -36,8 +36,8 @@ main (int argc, char **argv)
   for (;;)
     switch (getopt (argc, argv, "ptN:"))
       {
-      case 'p': print_tree = true; break;
-      case 't': time_travel = true; break;
+      case 'p': print_tree = true; N = -1; break;
+      case 't': time_travel = true; N = -1; break;
 	  case 'N': N = atoi(optarg); break;
       default: usage (); break;
 	  case '?':

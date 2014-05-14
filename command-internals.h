@@ -1,5 +1,6 @@
 // UCLA CS 111 Lab 1 command internals
 
+
 enum command_type
   {
     AND_COMMAND,         // A && B

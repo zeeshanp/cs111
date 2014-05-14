@@ -23,6 +23,7 @@ get_next_byte (void *stream)
   return getc (stream);
 }
 
+
 int
 main (int argc, char **argv)
 {
@@ -31,7 +32,24 @@ main (int argc, char **argv)
   bool time_travel = false;
   program_name = argv[0];
   int N;
-
+  
+  if ( (key = ftok("/dev/null", 'a')) == -1 )
+  {
+     error(1,errno, "Error creating key");
+  }
+  if ( (semid = semget(key, 1, 0666 | IPC_CREAT)) == -1)
+  {
+     error(1,errno, "Failure creating semaphore array");
+  }
+  union semun s;
+  s.val = 1;	
+  if ( semctl(semid,0, SETVAL, s) == -1)
+  {
+     error(1,errno, "Failure initializing semaphore");
+  }
+	 
+    	
+   
 
   for (;;)
     switch (getopt (argc, argv, "ptN:"))
@@ -58,7 +76,8 @@ main (int argc, char **argv)
   command_stream_t command_stream =
     make_command_stream (get_next_byte, script_stream);
 
- // command_t last_command = NULL;
+  //initialize semaphore
+
   command_t command;
 	if (time_travel)
 	{
@@ -75,11 +94,16 @@ main (int argc, char **argv)
 			 }
      		 else
 			 {
-	  			//last_command = command;
+
 	  			execute_command (command, time_travel);
 			 }
     	}
 	}
+  //destroy semaphore
+  if ( semctl(semid, 0, IPC_RMID) == -1)
+  {
+	error(1, errno, "Error destroying semaphore");
+  }  
 
   //return print_tree || !last_command ? 0 : command_status (last_command);
   return 0;

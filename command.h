@@ -1,6 +1,8 @@
 // UCLA CS 111 Lab 1 command interface
 
 #include <stdbool.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
 
 typedef struct command *command_t;
 typedef struct command_stream *command_stream_t;
@@ -27,3 +29,14 @@ int command_status (command_t);
 
 
 void execute_parallel(command_stream_t cs, int N);
+
+/* for semaphore operation */
+key_t key;
+int semid;
+
+union semun
+{
+	int val;
+	struct semid_ds *buf;
+	ushort *array;
+};

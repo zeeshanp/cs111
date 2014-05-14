@@ -434,7 +434,7 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 	}
 
 }
-
+/*
 union semun
 {
 	int val;
@@ -450,14 +450,15 @@ int sem_wait(int* id)
 	sb.sem_flg = 0;
 	if ( semop(*id, sb, 1) < 0) 
 }
-
+*/
 
 void execute_parallel(command_stream_t cs, int N)
 {
+	/*
 	int MAX_PROCS = N;
 	int NUM_PROCS = 0;	
 	int ret;
-	/*declare semaphore */
+	//declare semaphore 
 	key_t key = IPC_PRIVATE; 
 	arg.val = 0; //tells semctl() we are using 1st semaphore
 	int id;  //return value for semget()
@@ -468,8 +469,9 @@ void execute_parallel(command_stream_t cs, int N)
 	if ( semctl(id, 0, SETVAL, arg) < 0)
 	{
 		error(1, errno, "Error initializing semaphore.\n");
-	}
-	
+	}*/
+	if (N == 1)
+		N = 2;	
 	list_t no_dependencies = list_init();
 	list_t dependencies = list_init();
 	list_t graph_nodes = list_init();
@@ -501,11 +503,11 @@ void execute_parallel(command_stream_t cs, int N)
 	for (i = 0; i < no_dependencies->count; i++)
 	{
 		graph_node_t g = list_elem(no_dependencies, i);
-		if (limit_proc)
+/*		if (limit_proc)
 		{
 			while(CURR_PROCS == MAX_PROCS)
 				continue;
-		}
+		}*/
 
 		pid_t pid = fork();
 		if (pid < 0)
@@ -565,7 +567,7 @@ void execute_parallel(command_stream_t cs, int N)
 	list_free(no_dependencies);
 
 	//destroy semaphore
-	ret = semctl(*id, 0, IPC_RMID);				
+//	ret = semctl(*id, 0, IPC_RMID);				
 }
 
 

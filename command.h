@@ -40,3 +40,12 @@ union semun
 	struct semid_ds *buf;
 	ushort *array;
 };
+
+/*
+struct sembuf
+{
+	ushort_t sem_num;     // semaphore number
+	short sem_op;         // semaphore operation
+	short sem_flg;        // operation flags 
+};
+*/

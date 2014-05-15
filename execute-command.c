@@ -241,7 +241,6 @@ int command_status (command_t c)
 	return c->status;
 }
 
-
 /* List Implementation (for parallel execution)*/
 typedef struct list
 {
@@ -291,7 +290,6 @@ void* list_elem(list_t src, int i)
 {
 	return src->data[i];
 }
-
 void appendList(list_t dest, list_t src)
 {
 	size_t i;
@@ -434,44 +432,10 @@ void construct_dependencies(graph_node_t g, list_t graph_nodes)
 	}
 
 }
-/*
-union semun
-{
-	int val;
-	struct semid_ds *buf;
-	ushort_t *array;	
-} arg;
-
-int sem_wait(int* id)
-{
-	struct sembuf* sb;
-	sb.sem_num = 0;
-	sb.sem_op = 0;
-	sb.sem_flg = 0;
-	if ( semop(*id, sb, 1) < 0) 
-}
-*/
 
 void execute_parallel(command_stream_t cs, int N)
 {
-	/*
-	int MAX_PROCS = N;
-	int NUM_PROCS = 0;	
-	int ret;
-	//declare semaphore 
-	key_t key = IPC_PRIVATE; 
-	arg.val = 0; //tells semctl() we are using 1st semaphore
-	int id;  //return value for semget()
-	if ( (id = semget(key, 1, 0666|IPC_CREAT|IPC_EXCL)) < 0 )
-	{
-		error(1, errno, "Error creating semaphore.\n");
-	}
-	if ( semctl(id, 0, SETVAL, arg) < 0)
-	{
-		error(1, errno, "Error initializing semaphore.\n");
-	}*/
-	if (N == 1)
-		N = 2;	
+	
 	list_t no_dependencies = list_init();
 	list_t dependencies = list_init();
 	list_t graph_nodes = list_init();
@@ -494,35 +458,64 @@ void execute_parallel(command_stream_t cs, int N)
 			list_push(no_dependencies, g);
 		else
 			list_push(dependencies, g);
-	}
-		
+	 }
 
+	
+
+//IF LIMITING THREADS:
+
+	if (N != -1) {
+
+	//semaphore stuff
+
+	struct sembuf minus;
+	minus.sem_num = 0;
+	minus.sem_flg = 0;
+	minus.sem_op = -1;
+	
+	struct sembuf plus;
+	plus.sem_num = 0;
+	plus.sem_flg = 0;
+	plus.sem_op = 1;
 
 	//execute non_dependencies	
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
 	{
+		
 		graph_node_t g = list_elem(no_dependencies, i);
-/*		if (limit_proc)
+		/*if (limit_proc)
 		{
 			while(CURR_PROCS == MAX_PROCS)
 				continue;
 		}*/
+		
+		while (semctl(semid, 0, GETVAL) == 0)
+			continue;
 
 		pid_t pid = fork();
+		
 		if (pid < 0)
 			error(1,errno, "Error Forking");
 		else if (pid == 0)
 		{
+			if (semop(semid, &minus, 1) == -1)
+				error(1,errno, "Error SemOp");
 			int status = execute_switch(g->cmd);
+			printf("pls print plssss");
+			if (semop(semid, &plus, 1) == -1)
+				error(1,errno, "Error SemOp");
 			_exit(status);
 		}
+		
 		else if (pid > 0)
+		{
 			g->pid = pid;
+		}
 	}
 
-	//execute dependencies
 
+	//execute dependencies
 	for(i = 0; i < dependencies->count;i++)
 	{
 		graph_node_t g = (graph_node_t)list_elem(dependencies, i);
@@ -536,10 +529,18 @@ void execute_parallel(command_stream_t cs, int N)
 				continue;
 			waitpid(gg->pid, &status, 0);
 		}
+
+		while (semctl(semid, 0, GETVAL) == 0)
+			continue;
+
 		pid_t pid = fork();
 		if (pid == 0)
 		{
+			if (semop(semid, &minus, 1) == -1)
+				error(1,errno, "Error SemOp");
 			int status = execute_switch(g->cmd);
+			if (semop(semid, &plus, 1) == -1)
+				error(1,errno, "Error SemOp");
 			_exit(status);			
 			printf("Do we get here?\n");
 		}
@@ -547,6 +548,66 @@ void execute_parallel(command_stream_t cs, int N)
 			g->pid = pid;
 	}
 	
+	} //END LIMITING THREADS
+	
+	//BEGIN REGULAR TIMETRAVEL
+	else {
+	size_t i;
+	for (i = 0; i < no_dependencies->count; i++)
+	{
+		
+		graph_node_t g = list_elem(no_dependencies, i);
+
+		pid_t pid = fork();
+		
+		if (pid < 0)
+			error(1,errno, "Error Forking");
+		else if (pid == 0)
+		{
+
+			int status = execute_switch(g->cmd);
+			printf("pls print plssss");
+			_exit(status);
+		}
+		
+		else if (pid > 0)
+		{
+			g->pid = pid;
+		}
+	}
+
+
+	//execute dependencies
+	for(i = 0; i < dependencies->count;i++)
+	{
+		graph_node_t g = (graph_node_t)list_elem(dependencies, i);
+		//wait for each dependent cmd to run
+		size_t j;
+		int status;
+		for (j = 0; j < g->before->count; j++)
+		{
+			graph_node_t gg = (graph_node_t)list_elem(g->before, j);
+			while (gg->pid == -1)
+				continue;
+			waitpid(gg->pid, &status, 0);
+		}
+
+		pid_t pid = fork();
+		if (pid == 0)
+		{
+
+			int status = execute_switch(g->cmd);
+
+			_exit(status);			
+			printf("Do we get here?\n");
+		}
+		else if (pid > 0)
+			g->pid = pid;
+	}
+
+	} //END REGULAR TIMETRAVEL
+
+
 
 	//reap all remaining children. 
 	size_t x,y;
@@ -565,9 +626,7 @@ void execute_parallel(command_stream_t cs, int N)
 		graph_node_free(g);
 	}
 	list_free(no_dependencies);
-
-	//destroy semaphore
-//	ret = semctl(*id, 0, IPC_RMID);				
+			
 }
 
 

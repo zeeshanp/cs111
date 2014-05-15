@@ -33,20 +33,8 @@ main (int argc, char **argv)
   program_name = argv[0];
   int N;
   
-  if ( (key = ftok("/dev/null", 'a')) == -1 )
-  {
-     error(1,errno, "Error creating key");
-  }
-  if ( (semid = semget(key, 1, 0666 | IPC_CREAT)) == -1)
-  {
-     error(1,errno, "Failure creating semaphore array");
-  }
-  union semun s;
-  s.val = 1;	
-  if ( semctl(semid,0, SETVAL, s) == -1)
-  {
-     error(1,errno, "Failure initializing semaphore");
-  }
+
+
 	 
     	
    
@@ -76,7 +64,30 @@ main (int argc, char **argv)
   command_stream_t command_stream =
     make_command_stream (get_next_byte, script_stream);
 
+  
   //initialize semaphore
+  if (N != -1)
+  {
+	  if ( (key = ftok("/dev/null", 'a')) == -1 )
+	  {
+		 error(1,errno, "Error creating key");
+	  }
+  
+	  if ( (semid = semget(key, 1, 0666 | IPC_CREAT)) == -1)
+	  {
+		 error(1,errno, "Failure creating semaphore array");
+	  }
+
+	  union semun s;
+	  s.val = N;
+
+	  if (semctl(semid, 0, SETVAL, s) == -1)
+	  {
+		  error(1,errno, "Failure initializing semaphore");
+	  }
+  }
+
+
 
   command_t command;
 	if (time_travel)
@@ -99,11 +110,13 @@ main (int argc, char **argv)
 			 }
     	}
 	}
+
   //destroy semaphore
-  if ( semctl(semid, 0, IPC_RMID) == -1)
-  {
-	error(1, errno, "Error destroying semaphore");
-  }  
+	if (N != -1)
+		if ( semctl(semid, 0, IPC_RMID) == -1)
+		{
+			error(1, errno, "Error destroying semaphore");
+		}  
 
   //return print_tree || !last_command ? 0 : command_status (last_command);
   return 0;

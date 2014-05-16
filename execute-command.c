@@ -502,7 +502,7 @@ void execute_parallel(command_stream_t cs, int N)
 			if (semop(semid, &minus, 1) == -1)
 				error(1,errno, "Error SemOp");
 			int status = execute_switch(g->cmd);
-			printf("pls print plssss");
+			//printf("pls print plssss");
 			if (semop(semid, &plus, 1) == -1)
 				error(1,errno, "Error SemOp");
 			_exit(status);
@@ -542,7 +542,7 @@ void execute_parallel(command_stream_t cs, int N)
 			if (semop(semid, &plus, 1) == -1)
 				error(1,errno, "Error SemOp");
 			_exit(status);			
-			printf("Do we get here?\n");
+			//printf("Do we get here?\n");
 		}
 		else if (pid > 0)
 			g->pid = pid;
@@ -550,7 +550,7 @@ void execute_parallel(command_stream_t cs, int N)
 	
 	} //END LIMITING THREADS
 	
-	//BEGIN REGULAR TIMETRAVEL
+	//IF REGULAR TIMETRAVEL
 	else {
 	size_t i;
 	for (i = 0; i < no_dependencies->count; i++)
@@ -566,7 +566,7 @@ void execute_parallel(command_stream_t cs, int N)
 		{
 
 			int status = execute_switch(g->cmd);
-			printf("pls print plssss");
+			//printf("pls print plssss");
 			_exit(status);
 		}
 		
@@ -599,7 +599,7 @@ void execute_parallel(command_stream_t cs, int N)
 			int status = execute_switch(g->cmd);
 
 			_exit(status);			
-			printf("Do we get here?\n");
+			//printf("Do we get here?\n");
 		}
 		else if (pid > 0)
 			g->pid = pid;

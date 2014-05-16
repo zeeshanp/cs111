@@ -14,7 +14,7 @@ static char const *script_name;
 static void
 usage (void)
 {
-  error (1, 0, "usage: %s [-pt] SCRIPT-FILE", program_name);
+  error (1, 0, "usage: %s [-ptN] [NTHREADS] SCRIPT-FILE", program_name);
 }
 
 static int
@@ -32,12 +32,6 @@ main (int argc, char **argv)
   bool time_travel = false;
   program_name = argv[0];
   int N;
-  
-
-
-	 
-    	
-   
 
   for (;;)
     switch (getopt (argc, argv, "ptN:"))

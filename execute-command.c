@@ -490,22 +490,21 @@ void execute_parallel(command_stream_t cs, int N)
 				continue;
 		}*/
 		
-		while (semctl(semid, 0, GETVAL) == 0)
-			continue;
+		while (semctl(semid, 0, GETVAL) == 0)		//parent waits until semaphore
+			continue;								//changes from 0
 
-		pid_t pid = fork();
+		pid_t pid = fork();							//create new child
 		
 		if (pid < 0)
 			error(1,errno, "Error Forking");
 		else if (pid == 0)
 		{
-			if (semop(semid, &minus, 1) == -1)
+			if (semop(semid, &minus, 1) == -1)		//decrement semaphore and allocate resource
 				error(1,errno, "Error SemOp");
-			int status = execute_switch(g->cmd);
-			//printf("pls print plssss");
-			if (semop(semid, &plus, 1) == -1)
+			int status = execute_switch(g->cmd);	//execute command
+			if (semop(semid, &plus, 1) == -1)		//increment semaphore and release resource
 				error(1,errno, "Error SemOp");
-			_exit(status);
+			_exit(status);							//exit child thread
 		}
 		
 		else if (pid > 0)

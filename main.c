@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "command.h"
 
@@ -23,6 +24,12 @@ get_next_byte (void *stream)
   return getc (stream);
 }
 
+static char
+get_rand_char()
+{
+	srand(time(NULL));
+	return 'A' + (rand()%26);
+}
 
 int
 main (int argc, char **argv)
@@ -62,7 +69,8 @@ main (int argc, char **argv)
   //initialize semaphore
   if (N != -1)
   {
-	  if ( (key = ftok("/dev/null", 'a')) == -1 )
+	  char b = get_rand_char();
+	  if ( (key = ftok("/dev/null", b)) == -1 )
 	  {
 		 error(1,errno, "Error creating key");
 	  }

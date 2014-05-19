@@ -489,17 +489,15 @@ void execute_parallel(command_stream_t cs, int N)
 		while (semctl(semid, 0, GETVAL) == 0)		//parent waits until semaphore
 			continue;								//changes from 0
 
-		if (semop(semid, &minus, 1) == -1)
-			error(1,errno, "Error Semop");
-		
+				
 		pid_t pid = fork();							//create new child
 		
 		if (pid < 0)
 			error(1,errno, "Error Forking");
 		else if (pid == 0)
 		{
-		//	if (semop(semid, &minus, 1) == -1)		//decrement semaphore and allocate resource
-		//		error(1,errno, "Error SemOp");
+			if (semop(semid, &minus, 1) == -1)		//decrement semaphore and allocate resource
+				error(1,errno, "Error SemOp");
 			int status = execute_switch(g->cmd);	//execute command
 			if (semop(semid, &plus, 1) == -1)		//increment semaphore and release resource
 				error(1,errno, "Error SemOp");
@@ -531,14 +529,12 @@ void execute_parallel(command_stream_t cs, int N)
 		while (semctl(semid, 0, GETVAL) == 0)
 			continue;
 		
-		if (semop(semid, &minus, 1) == -1)
-			error(1,errno, "Error Semop");
-		
+				
 		pid_t pid = fork();
 		if (pid == 0)
 		{
-		//	if (semop(semid, &minus, 1) == -1)
-		//		error(1,errno, "Error SemOp");
+			if (semop(semid, &minus, 1) == -1)
+				error(1,errno, "Error SemOp");
 			int status = execute_switch(g->cmd);
 			if (semop(semid, &plus, 1) == -1)
 				error(1,errno, "Error SemOp");
